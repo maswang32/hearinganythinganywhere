@@ -56,3 +56,14 @@ The precomputed directory contains traced paths for all of, but in case you woul
 python trace.py precomputed/classroomBase classroomBase
 ```
 The above command will trace the classroomBase dataset to its default reflection order(s), and save the results in ```precomputed/classroomBase```.
+
+
+## Citation
+```
+@article{hearinganythinganywhere2024,
+  title={Hearing Anything Anywhere},
+  author={Mason Wang and Ryosuke Sawata and Samuel Clarke and Ruohan Gao and Elliott Wu and Jiajun Wu},
+  year={2024},
+  booktitle={Arkiv},
+}
+```
