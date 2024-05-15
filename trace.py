@@ -1,8 +1,8 @@
+import os
 import numpy as np
 import plotly.graph_objects as go
-import math
-import scipy.signal
-import os
+import argparse
+import rooms.dataset
 
 
 class Surface:
@@ -13,8 +13,8 @@ class Surface:
     ----------
     points: 3x3 np.array
         Each row provides a point on the surface. If the surface is a triangle, these are the points of the triangle.
-        If the surface is a parallelogram, the corner must be given first, then the diagonal points. The other corner is reflected
-        across the diagonal.
+        If the surface is a parallelogram, the corner must be given first,
+        then the diagonal points. The other corner is reflected across the diagonal.
     n: np.array
         normal vector to the plane
     parallelogram: bool
@@ -57,7 +57,8 @@ class Surface:
 
 def compute_barycentric(p, a, b, c):
     """
-    Given a point p on a triangle defined by 3d points a, b, c, compute the barycentric coordinates u, v, w with respect to a, b, c.
+    Given a point p on a triangle defined by 3d points a, b, c, 
+    compute the barycentric coordinates u, v, w with respect to a, b, c.
     """
     v0 = b - a
     v1 = c - a
@@ -271,9 +272,11 @@ def plot_points(fig, xyz,name="",color=None, opacity=1.0,size=None):
     Returns the figure.
     """
     if xyz.ndim==1:
-        fig.add_trace(go.Scatter3d(x=[xyz[0]], y=[xyz[1]], z=[xyz[2]],name=name, mode='markers', marker=dict(color=color, opacity=opacity, size=size)))
+        fig.add_trace(go.Scatter3d(x=[xyz[0]], y=[xyz[1]], z=[xyz[2]],
+            name=name, mode='markers', marker=dict(color=color, opacity=opacity, size=size)))
     else:
-        fig.add_trace(go.Scatter3d(x=xyz[:,0], y=xyz[:,1], z=xyz[:,2],mode='markers', marker=dict(color=color, opacity=opacity, size=size), name=name))
+        fig.add_trace(go.Scatter3d(x=xyz[:,0], y=xyz[:,1], z=xyz[:,2],
+            mode='markers', marker=dict(color=color, opacity=opacity, size=size), name=name))
     return fig
 
 def plot_lines(fig, xyzs, color=None): 
@@ -384,8 +387,6 @@ def gen_axial_indices(index1, index2, order):
     axial_1 = [index1, index2]*order_div_2
     axial_2 = [index2, index1]*order_div_2
     
-    
-    
     if order % 2 == 1:
         axial_1.append(index1)
         axial_2.append(index2)
@@ -393,8 +394,41 @@ def gen_axial_indices(index1, index2, order):
     return [axial_1, axial_2]
 
 
-def get_reflections_transmissions_and_delays(source, dest, surfaces, speed_of_sound, max_order=5, candidate_transmission_surface_indices=None, img_save_dir=None, parallel_surface_pairs = None, max_axial_order=50, return_points=False):
-    
+def get_reflections_transmissions_and_delays(
+    source, dest, surfaces, speed_of_sound=343, max_order=5,
+    candidate_transmission_surface_indices=None, img_save_dir=None,
+    parallel_surface_pairs = None, max_axial_order=50, return_points=False,
+    fs=48000):
+    """
+    Given surfaces, a source, and destination, traces paths up to a certain order.
+
+    Parameters
+    ----------
+    source: (3,) array. xyz location of source.
+    dest: (3,) array. xyz location of destination.
+    surfaces: list of Surface comprising the room's geometry
+    speed_of_sound: m/s
+    max_order: maximum order to trace reflections up to
+    candidate_transmission_surface_indices: surfaces where transmission is possible, surfaces if None
+    img_save_dir: if not None, where to save images of the trace
+    parallel_surface_pairs: list of list of int, pairs of surface indices.
+    max_axial_order: order to trace parallel surface pairs up to
+    return_points: if true, just returns points representing the trace
+    fs: sampling rate
+
+    Returns
+    -------
+    reflection_path_indices: list of list
+        For each path, the indices of the surfaces it reflects off
+    transmission_path_indices: list of list
+        For each path, the indices of the surfaces it transmits through
+    delays: np.array(N,)
+        Delay in samples of each reflection path, proportional to path length
+    start_directions: np.array(N,3)
+        The first segment of each reflection path.
+    end_directions: np.array(N,3)
+        Last segment of each reflection path.
+    """
     #Generate all possible orderings of reflection surfaces
     all_indices = []
     n_surfaces = len(surfaces)
@@ -457,7 +491,9 @@ def get_reflections_transmissions_and_delays(source, dest, surfaces, speed_of_so
         count=count+1
         if result is not None:
             full_distance, _, path = result
-            points, interactions, transmission_surface_indices = path_trace(path, test_surfaces, candidate_transmission_surfaces)
+            points, interactions, transmission_surface_indices = path_trace(path,
+                                                                            test_surfaces,
+                                                                            candidate_transmission_surfaces)
 
             if return_points and len(transmission_surface_indices)==0:
                 points_for_all_paths.append(points)
@@ -472,7 +508,9 @@ def get_reflections_transmissions_and_delays(source, dest, surfaces, speed_of_so
             end_directions.append(points[-1] - points[-2])
 
             if candidate_transmission_surface_indices is not None:
-                transmission_surface_indices = [surfaces[candidate_transmission_surface_indices[index]] for index in transmission_surface_indices]
+                transmission_surface_indices = [
+                    surfaces[candidate_transmission_surface_indices[index]] for index in transmission_surface_indices
+                    ]
 
             transmission_path_indices.append(transmission_surface_indices)
 
@@ -480,11 +518,15 @@ def get_reflections_transmissions_and_delays(source, dest, surfaces, speed_of_so
                 save_path = img_save_dir+str(count)+".png"
                 fig = go.Figure()
                 plot_surfaces(fig, test_surfaces, color='cyan')
-                actual_transmission_surfaces = [candidate_transmission_surfaces[j] for j in transmission_surface_indices]
+                actual_transmission_surfaces = [
+                    candidate_transmission_surfaces[j] for j in transmission_surface_indices
+                    ]
                 plot_surfaces(fig, actual_transmission_surfaces, color='red')
                 interactions = np.array(interactions)
-                plot_points(fig, np.array(points)[np.where(interactions=="Reflection")], color='cyan', name="Reflection Points")
-                plot_points(fig, np.array(points)[np.where(interactions=="Transmission")], color='red', opacity=0.7, name="Transmission Points")
+                plot_points(fig, np.array(points)[np.where(interactions=="Reflection")],
+                            color='cyan', name="Reflection Points")
+                plot_points(fig, np.array(points)[np.where(interactions=="Transmission")],
+                            color='red', opacity=0.7, name="Transmission Points")
                 plot_points(fig, source, color='green', name="Source")
                 plot_points(fig, dest, color='orange', name="Dest")
                 plot_lines(fig, np.array(points))
@@ -501,27 +543,26 @@ def get_reflections_transmissions_and_delays(source, dest, surfaces, speed_of_so
                 fig.write_image(save_path)
 
     print("Valid Paths:\t" + str(len(distances)))
-    delays = (48000*(np.array(distances)/speed_of_sound)).astype(int)
+    delays = (fs*(np.array(distances)/speed_of_sound)).astype(int)
 
     if not return_points:
-        return reflection_path_indices, transmission_path_indices, np.array(delays), np.array(start_directions), np.array(end_directions)
+        return (reflection_path_indices, transmission_path_indices,
+        np.array(delays), np.array(start_directions), np.array(end_directions))
     else:
         return points_for_all_paths
 
 
-import argparse
-import rooms.dataset
-
 if __name__=="__main__":
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('save_dir')
-    parser.add_argument('dataset')
-    parser.add_argument('--max_order', type=int, default = 5)
-    parser.add_argument('--max_axial_order', type=int, default = 50)
-    parser.add_argument('--test',action='store_true', default=False)
-    parser.add_argument('--start_from',type=int, default= 0)
-    parser.add_argument('--train_only',action='store_true', default=False)
+    parser.add_argument('save_dir', help='Folder to save results in')
+    parser.add_argument('dataset', help='Name of Dataset in the Dataloader Class')
+    parser.add_argument('--max_order', type=int, default = 5, help='Maximum Reflection Order')
+    parser.add_argument('--max_axial_order', type=int, default = 50, help='Max Reflection Order for Parallel Surfaces')
+    parser.add_argument('--test', action='store_true', default=False, help='Flat Axial Reflection Order')
+    parser.add_argument('--start_from',type=int, default=0,
+                        help='Datapoint index to start tracing from - used when computation was partially done')
+    parser.add_argument('--train_only',action='store_true', default=False, help='Only trace the training set')
 
     args = parser.parse_args()
 
@@ -544,12 +585,30 @@ if __name__=="__main__":
                 continue
 
             print(i, flush=True)
-            reflections, transmissions, delays, start_directions, end_directions = get_reflections_transmissions_and_delays(source=D.speaker_xyz, dest=D.xyzs[i], surfaces=D.all_surfaces, speed_of_sound=D.speed_of_sound,max_order=args.max_order, parallel_surface_pairs = D.parallel_surface_pairs, max_axial_order = args.max_axial_order)
+            reflections, transmissions, delays, start_directions, end_directions = (
+                get_reflections_transmissions_and_delays(source=D.speaker_xyz,
+                                                         dest=D.xyzs[i],
+                                                         surfaces=D.all_surfaces,
+                                                         speed_of_sound=D.speed_of_sound,
+                                                         max_order=args.max_order,
+                                                         parallel_surface_pairs = D.parallel_surface_pairs,
+                                                         max_axial_order = args.max_axial_order)
+            )
+
             np.save(os.path.join(args.save_dir,"reflections/"+str(i)+".npy"), np.array(reflections, dtype=object))
             np.save(os.path.join(args.save_dir,"transmissions/"+str(i)+".npy"), np.array(transmissions, dtype=object))
             np.save(os.path.join(args.save_dir,"delays/"+str(i)+".npy"), delays)
             np.save(os.path.join(args.save_dir,"starts/"+str(i)+".npy"), start_directions)
             np.save(os.path.join(args.save_dir,"ends/"+str(i)+".npy"), end_directions)
     else:
+        # If test, select an arbitrary point and plot reflection paths.
         print(D.xyzs.shape)
-        _ = get_reflections_transmissions_and_delays(source=D.speaker_xyz, dest=D.xyzs[70], surfaces=D.all_surfaces, speed_of_sound=D.speed_of_sound, max_order=args.max_order, img_save_dir=args.save_dir, parallel_surface_pairs = D.parallel_surface_pairs, max_axial_order = args.max_axial_order)
+        _ = get_reflections_transmissions_and_delays(
+            source=D.speaker_xyz,
+            dest=D.xyzs[70],
+            surfaces=D.all_surfaces,
+            speed_of_sound=D.speed_of_sound,
+            max_order=args.max_order,
+            img_save_dir=args.save_dir,
+            parallel_surface_pairs = D.parallel_surface_pairs,
+            max_axial_order = args.max_axial_order)

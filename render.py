@@ -1,18 +1,13 @@
-import scipy.signal
+import os
 import math
+import numpy as np
+import scipy.signal
 import torch
 import torch.nn as nn
-import numpy as np
-import trace
 import torchaudio.functional as F
-import os
-import librosa
+import trace
 
-"""
-Set the sampling rate to 48 kHz
-"""
-nyq = 24000
-fs = nyq*2
+
 torch.set_default_dtype(torch.float32)
 
 class Renderer(nn.Module):
@@ -26,23 +21,22 @@ class Renderer(nn.Module):
     RIR_length: int
         length of the RIR in samples
     filter_length: int
-        length of the reflection's contribution to the RIR, in samples
+        length of each reflection's contribution to the RIR, in samples
     source_response_length: int
         length of the convolutional kernel used to model the sound source
     surface_freqs: list of int
-        frequencies to fit each surface's reflection response at, the rest are interpolated
+        frequencies in Hz to fit each surface's reflection response at, the rest are interpolated
     dir_freqs: list of int
-        frequencies to fit the source's directivity response at, the rest are interpolated
+        frequencies in Hz to fit the source's directivity response at, the rest are interpolated
     n_fibonacci: int
         number of points to distribute on the unit sphere,
-        at which where the speaker's directivity is modeled
+        at which where the speaker's directivity is fit.
     spline_indices: list of int
         times (in samples) at which the late/early stage spline is fit
     toa_perturb: bool
         if times of arrival are perturbed (used during training)
     model_transmission: bool
         if we are modeling surface transmission as well.
-
     """
     def __init__(self, 
                 n_surfaces,
@@ -56,12 +50,14 @@ class Renderer(nn.Module):
                                   22000, 24000, 26000, 28000, 30000, 32000, 34000, 36000,
                                   38000, 40000, 44000, 48000, 56000, 70000, 80000],
                 toa_perturb=True,
-                model_transmission=False):
+                model_transmission=False,
+                fs=48000):
 
         super().__init__()
 
         # Device
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.nyq = fs/2
 
         # Arguments
         self.n_surfaces = n_surfaces
@@ -76,7 +72,6 @@ class Renderer(nn.Module):
         self.spline_indices = spline_indices
         self.toa_perturb = toa_perturb
         self.model_transmission = model_transmission
-        self.no_spline = no_spline
 
         # Other Attributes
         self.n_surface_freqs = len(surface_freqs)
@@ -103,15 +98,23 @@ class Renderer(nn.Module):
         else:
             # Second axis indices are specular reflection and absorption
             A = torch.zeros(self.n_surfaces,2,self.n_surface_freqs)
+        
+        self.energy_vector = nn.Parameter(A)
 
         # Setting up Frequency responses
         n_freq_samples = 1 + 2 ** int(math.ceil(math.log(self.filter_length, 2)))
-        self.freq_grid = torch.linspace(0.0, nyq, n_freq_samples)
-        surface_freq_indices = torch.round(self.surface_freqs*((n_freq_samples-1)/nyq)).int() 
-        self.surface_freq_interpolator = get_interpolator(n_freq_target=n_freq_samples, freq_indices=surface_freq_indices).to(self.device) 
-        dir_freq_indices = torch.round(self.dir_freqs*((n_freq_samples-1)/nyq)).int()
-        self.dir_freq_interpolator = get_interpolator(n_freq_target=n_freq_samples, freq_indices=dir_freq_indices).to(self.device)
-        self.window = torch.Tensor(scipy.fft.fftshift(scipy.signal.get_window("hamming", self.filter_length, fftbins=False))).to(self.device)
+        self.freq_grid = torch.linspace(0.0, self.nyq, n_freq_samples)
+        surface_freq_indices = torch.round(self.surface_freqs*((n_freq_samples-1)/self.nyq)).int() 
+
+        self.surface_freq_interpolator = get_interpolator(n_freq_target=n_freq_samples, 
+                                                          freq_indices=surface_freq_indices).to(self.device)
+
+        dir_freq_indices = torch.round(self.dir_freqs*((n_freq_samples-1)/self.nyq)).int()
+        self.dir_freq_interpolator = get_interpolator(n_freq_target=n_freq_samples,
+                                                      freq_indices=dir_freq_indices).to(self.device)
+
+        self.window = torch.Tensor(
+            scipy.fft.fftshift(scipy.signal.get_window("hamming", self.filter_length, fftbins=False))).to(self.device)
 
         # Source Response
         source_response = torch.zeros(self.source_response_length)
@@ -133,7 +136,7 @@ class Renderer(nn.Module):
         else:
             raise ValueError("Invalid Residual Mode")
 
-    def render_early(self, loc, hrirs=None, source_axis_1=None, source_axis_2=None):=
+    def render_early(self, loc, hrirs=None, source_axis_1=None, source_axis_2=None):
         """
         Renders the early-stage RIR
 
@@ -149,6 +152,10 @@ class Renderer(nn.Module):
         source_axis_2: np.array (3,)
             second axis specifying virtual source rotation,
             default is None which is (0,1,0)        
+
+        Returns
+        -------
+        RIR_early - (N,) tensor, early-stage RIR
         """
 
         """
@@ -168,7 +175,8 @@ class Renderer(nn.Module):
         gains_profile = (amplitudes[:,0:2,:].unsqueeze(0)**mask).unsqueeze(-1)
 
         # reflection_frequency_response = n_paths * n_freq_samples
-        reflection_frequency_response = torch.prod(torch.prod(torch.sum(self.surface_freq_interpolator*gains_profile, dim=-2),dim=-3),dim=-2)
+        reflection_frequency_response = torch.prod(torch.prod(
+            torch.sum(self.surface_freq_interpolator*gains_profile, dim=-2),dim=-3),dim=-2)
 
 
         """
@@ -180,9 +188,12 @@ class Renderer(nn.Module):
         if source_axis_1 is not None and source_axis_2 is not None:
             source_axis_3 = np.cross(source_axis_1 ,source_axis_2)
             source_basis = np.stack( (source_axis_1, source_axis_2, source_axis_3), axis=-1)
-            start_directions_normalized_transformed = start_directions_normalized @ torch.Tensor(source_basis).double().cuda()
-        
-        dots =  start_directions_normalized_transformed @ (self.sphere_points).T
+            start_directions_normalized_transformed = (
+                start_directions_normalized @ torch.Tensor(source_basis).double().cuda())
+            dots =  start_directions_normalized_transformed @ (self.sphere_points).T
+        else:
+            dots = start_directions_normalized @ (self.sphere_points).T
+
         
         # Normalized weights for each directivity bin
         weights = torch.exp(-self.sharpness*(1-dots))
@@ -191,7 +202,6 @@ class Renderer(nn.Module):
         directivity_profile = torch.sum(weighted, dim=1)
         directivity_response = torch.sum(directivity_profile.unsqueeze(-1) * self.dir_freq_interpolator, dim=-2)
         directivity_amplitude_response = torch.exp(directivity_response)
-
 
         """
         Computing overall frequency response, minimum phase transform
@@ -217,8 +227,9 @@ class Renderer(nn.Module):
             else:
                 delay = loc.delays[i]
 
-            # 140/delay gives us the radius in meters
-            reflection_kernels[i, delay:delay+out.shape[-1]] = out[i]*(140/(delay))
+            # factor/delay gives us the 1/(radius in meters)
+            factor = (2*self.nyq)/343
+            reflection_kernels[i, delay:delay+out.shape[-1]] = out[i]*(factor/(delay))
 
             if not self.model_transmission:
                 reflection_kernels = reflection_kernels*paths_without_transmissions.reshape(-1,1).to(self.device)
@@ -227,10 +238,12 @@ class Renderer(nn.Module):
             reflection_kernels = torch.unsqueeze(reflection_kernels, dim=1) # n_paths x 1 x length
             reflection_kernels = F.fftconvolve(reflection_kernels, hrirs.to(self.device)) # hrirs are n_paths x 2 x length
             RIR_early = torch.sum(reflection_kernels, axis=0) 
-            RIR_early = F.fftconvolve( (self.source_response - torch.mean(self.source_response)).view(1,-1), RIR_early)[...,:self.RIR_length]
+            RIR_early = F.fftconvolve(
+                (self.source_response - torch.mean(self.source_response)).view(1,-1), RIR_early)[...,:self.RIR_length]
         else:
             RIR_early = torch.sum(reflection_kernels, axis=0)
-            RIR_early = F.fftconvolve(self.source_response - torch.mean(self.source_response), RIR_early)[:self.RIR_length]
+            RIR_early = F.fftconvolve(
+                self.source_response - torch.mean(self.source_response), RIR_early)[:self.RIR_length]
         
         RIR_early = RIR_early*(self.sigmoid(self.decay)**self.times)
         return RIR_early
@@ -244,7 +257,7 @@ class Renderer(nn.Module):
         return late
 
     def render_RIR(self, loc, hrirs=None, source_axis_1=None, source_axis_2=None):
-        """Renders the RIR.""""
+        """Renders the RIR."""
         early = self.render_early(loc=loc, hrirs=hrirs, source_axis_1=source_axis_1, source_axis_2=source_axis_2)
 
         while torch.sum(torch.isnan(early)) > 0: # Check for numerical issues
@@ -270,8 +283,10 @@ class ListenerLocation():
     listener_xyz: np.array (3,)
         xyz location of the listener location in meters.
     n_surfaces: number of surfaces
-    reflections: list of list of int. Indices of surfaces that each path reflects on.
-    transmission: list of list of int. Indices of surfaces that each path transmits through.
+    reflections: list of list of int. 
+        Indices of surfaces that each path reflects on.
+    transmission: list of list of int. 
+        Indices of surfaces that each path transmits through.
     delays: np.array (n_paths,)
         time delays in samples for each path.
     start_directions: np.array(n_paths, 3)
@@ -279,27 +294,58 @@ class ListenerLocation():
     end_directions: np.array(n_paths, 3)
         vectors indicating the direction at which each path enters the listener.
     """
-    def __init__(self, source_xyz, listener_xyz, n_surfaces, reflections, transmissions, delays, start_directions, end_directions = None):
+    def __init__(self,
+                 source_xyz,
+                 listener_xyz,
+                 n_surfaces,
+                 reflections,
+                 transmissions,
+                 delays,
+                 start_directions,
+                 end_directions = None):
+
         self.source_xyz = source_xyz
         self.listener_xyz = listener_xyz
         self.reflection_mask = gen_counts(reflections,n_surfaces)
         self.transmission_mask = gen_counts(transmissions,n_surfaces)
         self.delays = torch.tensor(delays)
-        self.start_directions_normalized = torch.tensor(start_directions/np.linalg.norm(start_directions, axis=-1).reshape(-1, 1))
+        self.start_directions_normalized = torch.tensor(
+            start_directions/np.linalg.norm(start_directions, axis=-1).reshape(-1, 1))
 
         if end_directions is not None:
-            self.end_directions_normalized = torch.tensor(end_directions/np.linalg.norm(end_directions, axis=-1).reshape(-1, 1))
+            self.end_directions_normalized = torch.tensor(
+                end_directions/np.linalg.norm(end_directions, axis=-1).reshape(-1, 1))
         else:
             self.end_directions_normalized = None
 
-def get_listener(source_xyz, listener_xyz, surfaces, speed_of_sound=None, max_order=5, load_dir=None, load_num=None, parallel_surface_pairs=None, max_axial_order=50):
-    """Function to get a ListenerLocation. If load_dir is provided, loads precomputed paths"""
-    if load_dir is None: 
+def get_listener(source_xyz, listener_xyz, surfaces, load_dir=None, load_num=None,
+                 speed_of_sound=343, max_order=5,  parallel_surface_pairs=None, max_axial_order=50):
+    """
+    Function to get a ListenerLocation. If load_dir is provided, loads precomputed paths
 
+    Parameters
+    ----------
+    source_xyz: (3,) array indicating the source's location
+    listener_xyz: (3,) array indicating the listener's location
+    surface: list of Surface, surfaces comprising room geometry
+    load_dir: directory of precomputed paths, if None, traces from scratch.
+    speed_of_sounds: in m/s
+    max_order: maximum reflection order to trace to, if tracing from scratch.
+    load_num: within the directory of precomputed paths, the index to load from.
+    parallel_surface_pairs: list of list of int, surface pairs to do axial boosting, provided as indices in the 'surfaces' argument.
+    max_axial_order: max reflection order for parallel surfaces    
+
+    Returns
+    -------
+    ListenerLocation, characterizing the listener location in the room.
+    """
+    if load_dir is None: 
         # Tracing from Scratch
-        if speed_of_sound is None:
-            raise ValueError("Need Speed of Sound if Computing from Scratch!")
-        reflections, transmissions, delays, start_directions, end_directions = trace.get_reflections_transmissions_and_delays(source=source_xyz, dest=listener_xyz, surfaces=surfaces, speed_of_sound=speed_of_sound, max_order=max_order,parallel_surface_pairs=parallel_surface_pairs, max_axial_order=max_axial_order)
+        reflections, transmissions, delays, start_directions, end_directions = (
+            trace.get_reflections_transmissions_and_delays(
+            source=source_xyz, dest=listener_xyz, surfaces=surfaces, speed_of_sound=speed_of_sound,
+            max_order=max_order,parallel_surface_pairs=parallel_surface_pairs, max_axial_order=max_axial_order)
+        )
 
     else:
         # Loading precomputed paths
@@ -310,7 +356,15 @@ def get_listener(source_xyz, listener_xyz, surfaces, speed_of_sound=None, max_or
         start_directions = np.load(os.path.join(load_dir, "starts/"+str(load_num)+".npy"))
         end_directions = np.load(os.path.join(load_dir, "ends/"+str(load_num)+".npy"))
 
-    L = ListenerLocation(source_xyz=source_xyz, listener_xyz=listener_xyz, n_surfaces=len(surfaces), reflections=reflections, transmissions=transmissions, delays=delays, start_directions = start_directions, end_directions = end_directions)
+    L = ListenerLocation(
+        source_xyz=source_xyz,
+        listener_xyz=listener_xyz,
+        n_surfaces=len(surfaces),
+        reflections=reflections,
+        transmissions=transmissions,
+        delays=delays,
+        start_directions = start_directions,
+        end_directions = end_directions)
 
     return L
 
@@ -390,7 +444,6 @@ def fibonacci_sphere(n_samples):
         points.append((x, y, z))
 
     return np.array(points)
-
 
 
 def safe_log(x, eps=1e-9):

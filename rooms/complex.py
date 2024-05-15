@@ -1,11 +1,19 @@
-import trace as G
 import numpy as np
-import dataset
+import config
+import trace as G
+import rooms.dataset as dataset
+
+"""
+Importing this document automatically loads data from the Complex room dataset
+"""
 
 
-speed_of_sound = 343 #approximation
+speed_of_sound = 343 
 
 
+"""
+Specifying Room Geometry
+"""
 
 all_surfaces = []
 
@@ -24,7 +32,6 @@ x_0_wall = G.Surface(np.array([[0, 0, 0],
                                   [0, y_max, 0]]))
 
 all_surfaces.append(x_0_wall)
-
 
 
 # y_0_wall
@@ -82,9 +89,7 @@ x_max_wall = G.Surface(np.array([[x_max, y_door, 0],
 all_surfaces.append(x_max_wall)
 
 
-"""
-Overhang
-"""
+# Overhang
 y_overhang = 0.795
 z_1overhang = 2.644
 z_2overhang = 3.807
@@ -109,7 +114,6 @@ overhang_facing_up = G.Surface(np.array([[0, 0, z_2overhang],
                                   [x_max, 0, z_2overhang]]))
 
 all_surfaces.append(overhang_facing_up)
-
 
 
 
@@ -277,37 +281,62 @@ all_surfaces.append(middle_table_1)
 all_surfaces.append(middle_table_2)
 parallel_surface_pairs = [[0,7],[1,3],[1,5]]
 
-plot_surfaces = all_surfaces
 
 
+"""
+Train, Test indices, Making Dataset class instances
+"""
+
+
+train_indices_base = [5,  47,  82, 117, 145, 187, 220, 255, 290, 330+12, 360+12, 404]
+valid_indices_base = dataset.compute_complement_indices(train_indices_base, 408)[::2]
+
+# Default tracing orders
+max_order = 4
+max_axial_order = 10
 
 BaseDataset = dataset.Dataset(
-    load_dir = "/viscam/projects/audio_nerf/datasets/real2/Complex/complexBase",
+    load_dir = config.complexBase_path,
     speaker_xyz = np.array([ 2.8377, 10.1228,  1.1539]), #Error - 32 cm
     all_surfaces = all_surfaces,
     speed_of_sound = speed_of_sound,
     default_binaural_listener_forward = np.array([0,1,0]),
     default_binaural_listener_left = np.array([-1,0,0]),
-    parallel_surface_pairs = parallel_surface_pairs
+    parallel_surface_pairs = parallel_surface_pairs,
+    train_indices_base = train_indices_base,
+    valid_indices_base = valid_indices_base,
+    max_order = max_order,
+    max_axial_order = max_axial_order
 )
+
+
+train_indices_132 = [11,  13,  29,  43,  54,  60,  82,  87, 100, 116, 122, 141-12]
+valid_indices_132 = compute_complement_indices(train_indices_132, 132)[::2]
 
 RotationDataset = dataset.Dataset(
-    load_dir = "/viscam/projects/audio_nerf/datasets/real2/Complex/complexRotation",
-    speaker_xyz = np.array([2.762,10.245,0.90]),  #gt
+    load_dir = config.complexRotation_path,
+    speaker_xyz = np.array([2.762,10.245,0.90]),  #Ground Truth
     all_surfaces = all_surfaces,
     speed_of_sound = speed_of_sound,
     default_binaural_listener_forward = np.array([0,1,0]),
     default_binaural_listener_left = np.array([-1,0,0]),
-    parallel_surface_pairs = parallel_surface_pairs
+    parallel_surface_pairs = parallel_surface_pairs,
+    train_indices = train_indices_132,
+    valid_indices = valid_indices_132,
+    max_order = max_order,
+    max_axial_order = max_axial_order
 )
 
-# speaker_xyz = np.array([6.237, 8.180, 0.90])
 TranslationDataset = dataset.Dataset(
-    load_dir = "/viscam/projects/audio_nerf/datasets/real2/Complex/complexTranslation",
-    speaker_xyz = np.array([6.237, 8.180, 0.90]), #gt
+    load_dir = config.complexTranslation_path,
+    speaker_xyz = np.array([6.237, 8.180, 0.90]), # Ground Truth
     all_surfaces = all_surfaces,
     speed_of_sound = speed_of_sound,
     default_binaural_listener_forward = np.array([0,1,0]),
     default_binaural_listener_left = np.array([-1,0,0]),
-    parallel_surface_pairs = parallel_surface_pairs
+    parallel_surface_pairs = parallel_surface_pairs,
+    train_indices = train_indices_132,
+    valid_indices = valid_indices_132,
+    max_order = max_order,
+    max_axial_order = max_axial_order
 )

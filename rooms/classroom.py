@@ -1,19 +1,17 @@
-import trace as G
 import numpy as np
-import dataset
+import config
+import trace as G
+import rooms.dataset as dataset
+
 
 """
 Importing this document automatically loads data from the classroom dataset
 """
 
-"""
-Speed of Sound
-"""
-speed_of_sound = 343 # approximation
-# speed_of_sound = 344.909 estimated from all RIRs
+speed_of_sound = 343
 
 """
-Locations of all surfaces
+Locations of all surfaces in Meters
 """
 inches = 0.0254
 max_x = 7.1247
@@ -63,12 +61,26 @@ tables = [left_table, right_table, middle_table]
 
 base_surfaces = walls+tables
 
+
+"""
+Train and Test Split
+"""
+
+train_indices = np.arange(12)*(57)
+valid_indices = dataset.compute_complement_indices(list(train_indices) + list(np.arange(315)*2), 630)[::2]
+
+
+#Speaker xyz estimated from 12-point TOA, inside speaker, 8.5cm away from manual measurement.
 BaseDataset = dataset.Dataset(
-   load_dir = "/viscam/projects/audio_nerf/datasets/real2/Classroom/classroomBase",
-   speaker_xyz= np.array([3.5838, 5.7230, 1.2294]), #estimated 11-14, error 8.5 cm
+   load_dir = config.classroomBase_path,
+   speaker_xyz= np.array([3.5838, 5.7230, 1.2294]), 
    all_surfaces = base_surfaces,
    speed_of_sound = speed_of_sound,
    default_binaural_listener_forward = np.array([0,1,0]),
    default_binaural_listener_left = np.array([-1,0,0]),
-   parallel_surface_pairs=[[0,1], [2,3], [4,5]]
+   parallel_surface_pairs=[[0,1], [2,3], [4,5]],
+   train_indices = train_indices,
+   valid_indices = valid_indices,
+   max_order = 5
+   max_axial_order = 10
 )

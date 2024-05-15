@@ -1,15 +1,16 @@
 import numpy as np
-import scipy.io.wavfile
-import render
 import torch
+import scipy.io.wavfile
 import plotly.graph_objects as go
 import trace
+import render
 
 HRIR_dataset_dir = "HRIRs/azi_"
 
 def get_HRIR(azimuth, elevation):
     """
-    Returns 2-channel (2x256) HRIR given an azimuth/elevation angle
+    Returns 2-channel (2x256) HRIR given an azimuth and elevation angle in degrees.
+    Azimuth angles are anti-clockwise.
     """
     negative = elevation < 0
     elevation = abs(elevation)
@@ -65,29 +66,30 @@ def get_HRIR(azimuth, elevation):
         elif elevation >= 82.5:
             suffix = "90,0.wav"
 
-    #azimuths in SADIE go anti-clockwise
     azimuth = str(int(np.round(azimuth) % 360))
     path = HRIR_dataset_dir + azimuth + ",0_ele_" + suffix
     _, hrir = scipy.io.wavfile.read(path)
 
-    #32 bit - convert to float
+    # 32 bit - convert to float
     hrir = hrir.T/2147483648
     return hrir
 
-def compute_hrirs(incoming_listener_directions, listener_forward, listener_left, reflections=True):
+def compute_hrirs(incoming_listener_directions, listener_forward, listener_left):
     """
+    Returns a stack of head-related IRs for each listener direction.
+
     Parameters
     ----------
-    incoming_listener_directions: (P,3)
-    listener_forward: (3,)
-    listener_left: (3,)
-    reflections: bool, if we binauralize reflections
+    incoming_listener_directions: (P,3). Points towards the listener.
+    listener_forward: (3,). Vector pointing in the forward direction of listener.
+    listener_left: (3,). Vector pointing to the left of the listener.
 
     Returns
     -------
-    (P,2,256) array of HRIRs
+    (P,2,256) np.array of HRIRs
     """
-    incoming_listener_directions = -incoming_listener_directions/np.linalg.norm(incoming_listener_directions, axis=-1).reshape(-1,1)
+    norms = np.linalg.norm(incoming_listener_directions, axis=-1).reshape(-1,1)
+    incoming_listener_directions = -incoming_listener_directions/norms
     listener_forward = listener_forward/np.linalg.norm(listener_forward)
 
     #listener_left points left (right-handed coordinate system with listener_forward)
@@ -105,13 +107,9 @@ def compute_hrirs(incoming_listener_directions, listener_forward, listener_left,
     elevations = np.degrees(np.arctan(head_coordinates[:, 2]/np.linalg.norm(head_coordinates[:, 0:2],axis=-1)+1e-8))
 
     #Retrieve HRIRs
-    if reflections:
-        h_rirs = np.zeros((incoming_listener_directions.shape[0], 2, 256))
-        for i in range(incoming_listener_directions.shape[0]):
-            h_rirs[i] = get_HRIR(azimuth=azimuths[i], elevation=elevations[i])
-    else:
-        h_rirs = np.zeros((1,2,256))
-        h_rirs[0] = get_HRIR(azimuth=azimuths[0], elevation=elevations[0])
+    h_rirs = np.zeros((incoming_listener_directions.shape[0], 2, 256))
+    for i in range(incoming_listener_directions.shape[0]):
+        h_rirs[i] = get_HRIR(azimuth=azimuths[i], elevation=elevations[i])
 
     return h_rirs
 
@@ -119,41 +117,54 @@ def compute_hrirs(incoming_listener_directions, listener_forward, listener_left,
 def render_binaural(R, source_xyz, source_axis_1, source_axis_2,
                        listener_xyz, listener_forward, listener_left,
                        surfaces, speed_of_sound=None,
-                       load_dir=None, load_num=None,reflections=True,
-                       plot=False, parallel_surface_pairs=None, max_order=5, max_axial_order=50):
+                       load_dir=None, load_num=None,
+                       parallel_surface_pairs=None, max_order=5, max_axial_order=50,
+                       plot=False):
 
     """
+    Renders binaural RIRs using our model.
+
     Parameters
     ----------
     R: Renderer
-    source_xyz: location of source (3,)
-    source_axis_1: axis 1 of source coordinate system (3,)
-    source_axis_2: axis 2 of source coordinate system (3,)
-    listener_xyz: listener location
-    listener_forward: listener facing
-    listener_left: listener left axis
-    surface: list of surfaces making up the room
+    source_xyz: (3,) location of source 
+    source_axis_1: (3,) axis 1 of source coordinate system 
+    source_axis_2: (3,) axis 2 of source coordinate system 
+    listener_xyz: (3,) listener location
+    listener_forward: (3,) listener forward
+    listener_left: (3,) listener left
+    surfaces: list of Surface (trace.Surface) comprising the room's geometry
     speed_of_sound: speed of sound
-    load_num: index in precomputed
-    reflections: whether to binauralize reflections
-    plot: plots the location of the source/listener/surfaces
-    parallel_surface_pairs: surface pairs to do axial boosting
+    load_dir: directory to load precomputed reflection paths, None if recomputing.
+    load_num: index ({load_num}.npy) in load_dir corresponding to the location.
+    plot: bool, if we plot the location of the source/listener/surfaces
+    parallel_surface_pairs: list of list of int, surface pairs to do axial boosting, 
+        given as indices in the 'surfaces' argument.
     max_order: max reflection order
-    max_axial_order: max axial reflection order
+    max_axial_order: max reflection order for parallel surfaces    
 
     Returns
     -------
-    predicted RIR or full audio
+    predicted binaural RIR, (T,)
     """
 
-    L = render.get_listener(source_xyz=source_xyz, listener_xyz=listener_xyz, surfaces=surfaces, speed_of_sound=speed_of_sound, load_dir=load_dir, load_num=load_num, parallel_surface_pairs=parallel_surface_pairs, max_order=max_order, max_axial_order=max_axial_order)
+    L = render.get_listener(source_xyz=source_xyz,
+                            listener_xyz=listener_xyz,
+                            surfaces=surfaces,
+                            speed_of_sound=speed_of_sound,
+                            load_dir=load_dir,
+                            load_num=load_num,
+                            parallel_surface_pairs=parallel_surface_pairs,
+                            max_order=max_order,
+                            max_axial_order=max_axial_order)
 
-    hrirs = torch.tensor(compute_hrirs(incoming_listener_directions=L.end_directions_normalized, listener_forward=listener_forward, listener_left=listener_left, reflections=reflections)).cuda()
+    hrirs = torch.tensor(compute_hrirs(incoming_listener_directions=L.end_directions_normalized,
+                                        listener_forward=listener_forward,
+                                        listener_left=listener_left)).to(R.device)
 
     if plot:
-        #Assume Ears are level (same z for each ear). ear_axis is left ear to right ear.
         listener_up = np.cross(listener_forward ,listener_left)
-        head_basis = np.stack( (listener_forward, listener_forward, listener_up), axis=-1)
+        head_basis = np.stack((listener_forward, listener_forward, listener_up), axis=-1)
 
         fig = go.Figure()
         trace.plot_surfaces(fig, surfaces)
@@ -167,11 +178,15 @@ def render_binaural(R, source_xyz, source_axis_1, source_axis_2,
                 label = "Ear Axis"
             elif i == 2:
                 label = "Top of Head"
-            fig.add_trace(go.Scatter3d(x=[listener_xyz[0], listener_xyz[0]+vec[0]], y=[listener_xyz[1], listener_xyz[1]+vec[1]], z=[listener_xyz[2], listener_xyz[2]+vec[2]], mode='lines', name=label,line=dict(
-                            width=5
-                        )))
+            fig.add_trace(go.Scatter3d(x=[listener_xyz[0],listener_xyz[0]+vec[0]],
+                                       y=[listener_xyz[1], listener_xyz[1]+vec[1]],
+                                       z=[listener_xyz[2], listener_xyz[2]+vec[2]],
+                                       mode='lines', name=label,line=dict(width=5)))
         fig.show()
 
     with torch.no_grad():
-        rir = R.render_RIR(loc=L, hrirs=hrirs, source_axis_1=source_axis_1, source_axis_2=source_axis_2).detach().cpu().numpy()
+        rir = R.render_RIR(loc=L,
+                           hrirs=hrirs,
+                           source_axis_1=source_axis_1,
+                           source_axis_2=source_axis_2).detach().cpu().numpy()
         return rir

@@ -1,32 +1,22 @@
-import metrics
 import numpy as np
 import torch
-import matplotlib.pyplot as plt
-from pylab import rcParams
-import matplotlib
-import librosa
-import librosa.display
-import plotly.graph_objects as go
-import argparse
-import rooms.dataset
 import torchaudio.functional as F
-import os
-import pickle
-import pandas as pd
-import glob
+import metrics
 
-fs = 48000
-
-def compute_error(predicted_audios, gt_audios, cuda=True, metric=metrics.diffimpactLoss):
+def compute_error(predicted_audios, gt_audios, metric, device='cuda:0'):
     """
+    Computes errors between a stack of two audio recordings.
+
     Parameters
     ----------
     predicted_audios: 2-dim array (N,T)
     gt_audios: 2-dim array (N,T)
-    cuda: if we're using cuda
-    metric: evaluation function, compares 2 audio files
+    metric: function, evaluation function that compares 2 audio files
+
+    Returns
+    -------
+    errors: (N,) - errors for each of the N pairs of recordings.
     """
-    device = "cuda:0" if cuda else "cpu"
 
     errors = np.zeros((gt_audios.shape[0]))
 
@@ -38,35 +28,50 @@ def compute_error(predicted_audios, gt_audios, cuda=True, metric=metrics.diffimp
     return errors
 
 
-"""
-Rendering Music
-"""
-def render_music(pred_rirs, music_dls, save_path=None, length=10*48000, cuda=True):
+def render_music(pred_rirs, music_sources, rir_length=96000, length=10*48000, device='cuda:0'):
+    """
+    Renders music given a stack of RIRs music sources through convolution.
 
-    device = "cuda:0" if cuda else "cpu"
+    Parameters
+    ----------
+    pred_rirs: 2-dim array (N,T)
+    music_sources: music source files, usually the direct-line recordings. (N,T2)
+    rir_length: length to truncate RIRs to
+    length: length to truncate music to after rendering
+
+    Returns
+    -------
+    pred_musics: (N, T3) array of predicted music recordings
+    """
+
     pred_rirs = torch.Tensor(pred_rirs)
-    music_dls = torch.Tensor(music_dls)
+    music_sources = torch.Tensor(music_sources)    
+    pred_musics = torch.zeros((music_sources.shape[0], music_sources.shape[1], length))
 
-    
-    pred_musics = torch.zeros((music_dls.shape[0], music_dls.shape[1], length))
-
-    for i in range(music_dls.shape[0]):
-        pred_musics[i] = F.fftconvolve(pred_rirs[i,:96000].unsqueeze(0).to(device), music_dls[i,:].to(device))[...,:length].cpu()
-
-    if save_path is not None:
-        np.save(os.path.join(save_path,"pred_musics.npy"), pred_musics.numpy())    
+    for i in range(music_sources.shape[0]):
+        pred_musics[i] = F.fftconvolve(pred_rirs[i,:rir_length].unsqueeze(0).to(device),
+                                        music_sources[i,:].to(device))[...,:length].cpu()
 
     torch.cuda.empty_cache()
     return pred_musics.numpy()
 
 
-"""
-Evaluating Rendered
-"""
-def eval_music(pred_music, gt_music, metric, length=10*48000,cuda=True):
+def eval_music(pred_music, gt_music, metric, length=10*48000, device='cuda:0'):
+    """
+    Evaluates rendered music against ground truth music.
 
-    device = "cuda:0" if cuda else "cpu"
-    gt_music = torch.Tensor(gt_music[...,116:length+116])
+    Parameters
+    ----------
+    pred_music: 2-dim array (N,K,T1), where K is the number of songs
+    gt_music: music source files, usually the direct-line recordings. (N,K,T2)
+    metric: function comparing 2 audio files
+    length: length to truncate music to before evaluation.
+
+    Returns
+    -------
+    errors: (N,K) errors for each datapoint, song pair.
+    """
+    gt_music = torch.Tensor(gt_music[...,:length])
     pred_music = torch.Tensor(pred_music[...,:length])
 
     assert gt_music.shape == pred_music.shape

@@ -1,7 +1,11 @@
-import trace as G
 import numpy as np
-import dataset
+import config
+import trace as G
+import rooms.dataset as dataset
 
+"""
+Importing this document automatically loads data from the Hallway dataset
+"""
 
 speed_of_sound = 343
 
@@ -77,73 +81,102 @@ config_3_panel_1 = G.Surface(np.array([[config_3_panel_1_x_1, config_3_panel_1_y
                                        [config_3_panel_1_x_2, config_3_panel_1_y_2, config_3_panel_1_z_2]]))
 
             
-left_music_recs = np.load("/viscam/projects/audio_nerf/datasets/real/Hallway/HallwayBase/gt_binaural_left_recordings.npy")
-right_music_recs = np.load("/viscam/projects/audio_nerf/datasets/real/Hallway/HallwayBase/gt_binaural_right_recordings.npy")
-bin_music_recs = np.stack((left_music_recs,right_music_recs),axis=1)
+"""
+Train, Test indices, Making Dataset class instances
+"""
 
-
+# Default tracing orders
+max_order = 5
+max_axial_order = 50
 
 #gt speaker - speaker_xyz = np.array([63*cm, (1042.1)*cm, 45*cm])
-#gt trans speaker - [121*cm, (746+998.5)*cm, 45*cm]
+base_train_indices = [5, 58, 99, 148, 203, 241, 296, 342, 384, 441, 482, 535]
 BaseDataset = dataset.Dataset(
-    load_dir = "/viscam/projects/audio_nerf/datasets/real2/Hallway/hallwayBase",
-    speaker_xyz = np.array([ 0.6870, 10.2452,  0.5367]), #error 20 cm
+    load_dir = "Hallway/hallwayBase",
+    speaker_xyz = np.array([ 0.6870, 10.2452,  0.5367]), #error 20 cm from manual measurement
     all_surfaces = walls,
     speed_of_sound = speed_of_sound,
     default_binaural_listener_forward = np.array([0,1,0]),
     default_binaural_listener_left = np.array([-1,0,0]),
-    parallel_surface_pairs=[[2,3], [4,5]]
+    parallel_surface_pairs=[[2,3], [4,5]],
+    train_indices = base_train_indices, #Yea!
+    valid_indices = dataset.compute_complement_indices(base_train_indices + list(np.arange(288)*2), 576)[::2],
+    max_order = max_order,
+    max_axial_order = max_axial_order
 )
 
 
+alt_config_train_indices = [5, 10, 15, 16, 35, 25, 44, 42, 48, 57, 62, 67]
+alt_valid_indices = dataset.compute_complement_indices(alt_config_train_indices, 72)[::2]
+
 RotationDataset = dataset.Dataset(
-    load_dir = "/viscam/projects/audio_nerf/datasets/real2/Hallway/hallwayRotation",
+    load_dir = "Hallway/hallwayRotation",
     speaker_xyz = np.array([ 0.5091, 10.4333,  0.5464]), #error 15.5 cm
     all_surfaces = walls,
     speed_of_sound = speed_of_sound,
     default_binaural_listener_forward = np.array([0,1,0]),
     default_binaural_listener_left = np.array([-1,0,0]),
-    parallel_surface_pairs=[[2,3], [4,5]]
+    parallel_surface_pairs=[[2,3], [4,5]],
+    train_indices = alt_config_train_indices,
+    valid_indices = alt_valid_indices,
+    max_order = max_order,
+    max_axial_order = max_axial_order
 )
 
-
+#gt translated speaker - [121*cm, (746+998.5)*cm, 45*cm]
 TranslationDataset = dataset.Dataset(
-    load_dir = "/viscam/projects/audio_nerf/datasets/real2/Hallway/hallwayTranslation",
+    load_dir = "Hallway/hallwayTranslation",
     speaker_xyz = np.array([ 1.2120, 17.1969,  0.5444]), #26.5 cm error
     all_surfaces = walls,
     speed_of_sound = speed_of_sound,
     default_binaural_listener_forward = np.array([0,1,0]),
     default_binaural_listener_left = np.array([-1,0,0]),
-    parallel_surface_pairs=[[2,3], [4,5]]
+    parallel_surface_pairs=[[2,3], [4,5]],
+    train_indices = alt_config_train_indices,
+    valid_indices = alt_valid_indices,
+    max_order = max_order,
+    max_axial_order = max_axial_order
 )
 
 PanelDataset1 = dataset.Dataset(
-    load_dir = "/viscam/projects/audio_nerf/datasets/real2/Hallway/hallwayPanel1",
+    load_dir = "Hallway/hallwayPanel1",
     speaker_xyz = np.array([ 0.6549, 10.2356,  0.4618]), #19 cm error
     all_surfaces = walls + [panel_1],
     speed_of_sound = speed_of_sound,
     default_binaural_listener_forward = np.array([0,1,0]),
     default_binaural_listener_left = np.array([-1,0,0]),
-    parallel_surface_pairs=[[2,3], [4,5]]
+    parallel_surface_pairs=[[2,3], [4,5]],
+    train_indices = alt_config_train_indices,
+    valid_indices = alt_valid_indices,
+    max_order = max_order,
+    max_axial_order = max_axial_order
 )
 
 
 PanelDataset2 = dataset.Dataset(
-    load_dir = "/viscam/projects/audio_nerf/datasets/real2/Hallway/hallwayPanel2",
+    load_dir = "Hallway/hallwayPanel2",
     speaker_xyz = np.array([ 0.5002, 10.1438,  0.3348]), #32 cm error
     all_surfaces = walls + [panel_2],
     speed_of_sound = speed_of_sound,
     default_binaural_listener_forward = np.array([0,1,0]),
     default_binaural_listener_left = np.array([-1,0,0]),
-    parallel_surface_pairs=[[2,3], [4,5]]
+    parallel_surface_pairs=[[2,3], [4,5]],
+    train_indices = alt_config_train_indices,
+    valid_indices = alt_valid_indices,
+    max_order = max_order,
+    max_axial_order = max_axial_order
 )
 
 PanelDataset3 = dataset.Dataset(
-    load_dir = "/viscam/projects/audio_nerf/datasets/real2/Hallway/hallwayPanel3",
+    load_dir = "Hallway/hallwayPanel3",
     speaker_xyz = np.array([0.4746, 9.9688, 0.2613]), # 51 cm error
     all_surfaces =  walls + [panel_2, config_3_panel_1],
     speed_of_sound = speed_of_sound,
     default_binaural_listener_forward = np.array([0,1,0]),
     default_binaural_listener_left = np.array([-1,0,0]),
-    parallel_surface_pairs=[[2,3], [4,5]]
+    parallel_surface_pairs=[[2,3], [4,5]],
+    train_indices = alt_config_train_indices,
+    valid_indices = alt_valid_indices,
+    max_order = max_order,
+    max_axial_order = max_axial_order
 )

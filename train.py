@@ -1,38 +1,54 @@
-import torch
+import os
 import numpy as np
+import torch
+import torchaudio.functional as F
 import metrics
 import render
-import os
 import evaluate
-import argparse
 import binauralize
 import rooms.dataset
-import torchaudio.functional as F
+import argparse
 
+"""
+train.py is used for training and evaluation.
+"""
 
-fs = 48000 # Default sampling rate
 torch.set_default_dtype(torch.float32)
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
-"""
-train.py - used for training and testing the models
-"""
 
 def makedir_if_needed(directory):
     if not os.path.exists(directory):
         os.makedirs(directory)
 
-def initialize(train_indices, source_xyz, listener_xyzs, n_surfaces, load_dir):
-    """Creates a list of ListenerLocations based on a precomputed reflections from load_dir"""
+def initialize(indices, source_xyz, listener_xyzs, n_surfaces, load_dir):
+    """
+    Creates a list of ListenerLocations based on a precomputed reflections from load_dir.
+    
+    Parameters
+    ----------
+    indices: list of int (len K), of indices in the load_dir to create ListenerLocations for
+    source_xyz: (3,) np.array of the source locatoin
+    listener_xyzs: (N,3) np.array of the listener locations (ALL data points).
+    n_surface: int representing the number of surfaces
+    load_dir: directory to load precomputed reflection paths from.
+
+    Returns
+    -------
+    list of ListenerLocation, corresponding to indices.
+    """
     Ls = []
-    for idx in train_indices:
+    for idx in indices:
         print("Loading paths from "+ load_dir)
         reflections = np.load(os.path.join(load_dir,"reflections/"+str(idx)+".npy"), allow_pickle=True)
         transmissions = np.load(os.path.join(load_dir, "transmissions/"+str(idx)+".npy"), allow_pickle=True)
         delays = np.load(os.path.join(load_dir, "delays/"+str(idx)+".npy"))
         start_directions = np.load(os.path.join(load_dir, "starts/"+str(idx)+".npy"))
         end_directions = np.load(os.path.join(load_dir, "ends/"+str(idx)+".npy"))
-        L = render.ListenerLocation(source_xyz=source_xyz, listener_xyz = listener_xyzs[idx], n_surfaces=n_surfaces, reflections=reflections, transmissions=transmissions, delays=delays, start_directions=start_directions, end_directions=end_directions)
+        L = render.ListenerLocation(source_xyz=source_xyz,
+                                    listener_xyz = listener_xyzs[idx],
+                                    n_surfaces=n_surfaces, reflections=reflections,
+                                    transmissions=transmissions, delays=delays, 
+                                    start_directions=start_directions, end_directions=end_directions)
         Ls.append(L)
     return Ls
 
@@ -40,8 +56,11 @@ def train_loop(R, Ls, train_gt_audio, D = None,
                 n_epochs=1000, batch_size=4, lr = 1e-2, loss_fcn = None,
                 save_dir=None, 
                 pink_noise_supervision = False, pink_start_epoch=500,
-                continue_train=False):
+                continue_train=False,
+                fs=48000):
     """
+    Runs the training process
+
     Parameters
     ----------
     R: Renderer
@@ -58,6 +77,10 @@ def train_loop(R, Ls, train_gt_audio, D = None,
         if we should supervise using pink noise during training
     pink_start_epoch: int
         what epoch we should start supervising the model on pink noise
+
+    Returns
+    -------
+    losses: list of float training losses.
     """
 
     print("Loss:\t"+str(loss_fcn))
@@ -68,14 +91,10 @@ def train_loop(R, Ls, train_gt_audio, D = None,
     train_gt_audio = torch.Tensor(train_gt_audio).cuda()
 
     # Lower learning rate on residual
-    if not no_residual:
-        my_list = ['RIR_residual']
-        my_params = list(map(lambda x: x[1],list(filter(lambda kv: kv[0] in my_list, R.named_parameters()))))
-        base_params = list(map(lambda x: x[1],list(filter(lambda kv: kv[0] not in my_list, R.named_parameters()))))
-        optimizer = torch.optim.Adam([{'params': base_params}, {'params': my_params, 'lr': 1e-4}], lr=lr)
-    else:
-        optimizer = torch.optim.Adam(R.parameters(), lr=lr)
-        print("Learning Rate = " + str(lr))
+    my_list = ['RIR_residual']
+    my_params = list(map(lambda x: x[1],list(filter(lambda kv: kv[0] in my_list, R.named_parameters()))))
+    base_params = list(map(lambda x: x[1],list(filter(lambda kv: kv[0] not in my_list, R.named_parameters()))))
+    optimizer = torch.optim.Adam([{'params': base_params}, {'params': my_params, 'lr': 1e-4}], lr=lr)
 
     for name, param in R.named_parameters():
         print(name)
@@ -105,16 +124,17 @@ def train_loop(R, Ls, train_gt_audio, D = None,
             optimizer.zero_grad()
 
             for idx in curr_indices:
+                print(idx)
 
                 output = R.render_RIR(Ls[idx])
-                loss = loss_fcn(output, train_gt_audio[idx], tiny_hop=tiny_hop_for_rir)
+                loss = loss_fcn(output, train_gt_audio[idx])
 
                 if pink_noise_supervision and epoch >= pink_start_epoch:
 
                     print("Generating Pink Noise")
-                    pink_noise = generate_pink_noise(5*48000, fs=fs)
-                    convolved_pred = F.fftconvolve(output, pink_noise)[...,:5*48000]
-                    convolved_gt =  F.fftconvolve(train_gt_audio[idx,:96000], pink_noise)[...,:5*48000]
+                    pink_noise = generate_pink_noise(5*fs, fs=fs)
+                    convolved_pred = F.fftconvolve(output, pink_noise)[...,:5*fs]
+                    convolved_gt =  F.fftconvolve(train_gt_audio[idx,:R.RIR_length], pink_noise)[...,:5*fs]
                     pink_noise_loss = loss_fcn(convolved_pred, convolved_gt, tiny_hop=False)
                     loss += pink_noise_loss*0.2
                 
@@ -138,7 +158,7 @@ def train_loop(R, Ls, train_gt_audio, D = None,
 #Note - this function relies on precomputed reflection paths
 def inference(R, source_xyz, xyzs, load_dir, source_axis_1=None, source_axis_2=None):
     """
-    Render monoaural RIRs at given listener locations
+    Render monoaural RIRs at given precomputed reflection paths.
 
     Parameters
     ----------
@@ -155,7 +175,11 @@ def inference(R, source_xyz, xyzs, load_dir, source_axis_1=None, source_axis_2=N
         default is None which is (1,0,0)
     source_axis_2: np.array (3,)
         second axis specifying virtual source rotation,
-        default is None which is (0,1,0)        
+        default is None which is (0,1,0)    
+
+    Returns
+    -------
+    predictions: np.array (N, T) of predicted RIRs    
     """
 
     predictions = np.zeros((xyzs.shape[0], R.RIR_length))
@@ -169,7 +193,14 @@ def inference(R, source_xyz, xyzs, load_dir, source_axis_1=None, source_axis_2=N
             delays = np.load(os.path.join(load_dir, "delays/"+str(idx)+".npy"),allow_pickle=True)
             start_directions = np.load(os.path.join(load_dir, "starts/"+str(idx)+".npy"))
 
-            L = render.ListenerLocation(source_xyz=source_xyz, listener_xyz=xyzs[idx], n_surfaces=R.n_surfaces, reflections=reflections, transmissions=transmissions, delays=delays, start_directions = start_directions)
+            L = render.ListenerLocation(
+                source_xyz=source_xyz,
+                listener_xyz=xyzs[idx],
+                n_surfaces=R.n_surfaces,
+                reflections=reflections,
+                transmissions=transmissions,
+                delays=delays,
+                start_directions = start_directions)
 
             predict = R.render_RIR(L, source_axis_1=source_axis_1, source_axis_2=source_axis_2)
             predictions[idx] = predict.detach().cpu().numpy()
@@ -212,40 +243,42 @@ if __name__=="__main__":
     parser.add_argument('save_dir', help="Where to save weights/plots")
     parser.add_argument('dataset_name', help="Name of Dataset, e.g. classroomBase")
     parser.add_argument('load_dir', help="Where to load precomputed paths")
-    parser.add_argument('late_stage_model', default="UniformResidual")
 
-    parser.add_argument('--n_epochs', help="Number of training epochs", type=int, default=1000)
-    parser.add_argument('--lr', type=float, default=1e-2)
-    parser.add_argument('--loss', default="mason_special_L1_loss")
-    parser.add_argument('--continue_train', action='store_true',default=False)
+    parser.add_argument('--n_epochs', type=int, default=1000, help="Number of training epochs")
+    parser.add_argument('--lr', type=float, default=1e-2, help="Learning Rate")
+    parser.add_argument('--batch_size', type=int, default=4, help="Batch Size")
+
+    parser.add_argument('--loss', default="training_loss", help="loss function in metrics.py")
+    parser.add_argument('--continue_train', action='store_true',default=False,
+                        help="continue train from checkpoint in save_dir")
+
+    parser.add_argument('--late_stage_model', default="UniformResidual", help="Model for late stage diffuse field")
     parser.add_argument('--n_fibonacci', type=int, default=128, help="Number of Points to distribute on a sphere")    
+    parser.add_argument('--toa_perturb', action='store_true', default=True, help="time-of-arrival perturbation")
+    parser.add_argument('--model_transmission', action='store_true', default=False, help="Transmission Modeling")
+    parser.add_argument('--fs',type=int, default=48000, help="Sample Rate")
 
-    parser.add_argument('--toa_perturb',action='store_true', default=True)
-    parser.add_argument('--model_transmission',action='store_true', default=False)
-
-    parser.add_argument('--pink_noise_supervision', action='store_true', default=True, help="If we should use pink noise")
-    parser.add_argument('--pink_start_epoch', type=int, default=500, help="Number of epochs after which we train with pink noise")
+    parser.add_argument('--pink_noise_supervision', action='store_true', default=True, help="Use pink noise")
+    parser.add_argument('--pink_start_epoch', type=int, default=500, help="N. epochs before we train with pink noise")
 
     #Skipping various stages
-    parser.add_argument('--skip_train', action='store_true',default=False, help="Skip Training")
-    parser.add_argument('--skip_inference', action='store_true',default=False, help="Skip Rendering RIRs")
-    parser.add_argument('--skip_eval', action='store_true',default=False, help="Skip Evaluation")
-    parser.add_argument('--skip_music', action='store_true',default=False, help="Skip Rendering Music")
-    parser.add_argument('--skip_binaural', action='store_true',default=False, help="Skip Binaural Rendering")
-    parser.add_argument('--valid',action='store_true', default=False, help="Evaluate on Validation Set")
+    parser.add_argument('--skip_train', action='store_true',default=False, help="Skip training")
+    parser.add_argument('--skip_inference', action='store_true',default=False, help="Skip rendering RIRs")
+    parser.add_argument('--skip_eval', action='store_true',default=False, help="Skip evaluation")
+    parser.add_argument('--skip_music', action='store_true',default=False, help="Skip rendering music")
+    parser.add_argument('--skip_binaural', action='store_true',default=False, help="Skip binaural rendering")
+    parser.add_argument('--valid',action='store_true', default=False, help="Evaluate on valid instead of test")
     args = parser.parse_args()
 
     #Loading Dataset
     print("Loading Dataset:\t" + args.dataset_name)
     D = rooms.dataset.dataLoader(args.dataset_name)
 
-    R = render.Renderer(n_surfaces=len(D.all_surfaces), n_fibonacci=args.n_fibonacci, late_stage_model=args.late_stage_model,
-                        toa_perturb = args.toa_perturb, model_transmission=args.model_transmission, no_spline=args.no_spline,
-                        point_cutoff=args.point_cutoff, train_sharpness = args.train_sharpness).cuda()
-    loss_fcn = getattr(metrics, args.loss)
+    R = render.Renderer(n_surfaces=len(D.all_surfaces), n_fibonacci=args.n_fibonacci,
+                        late_stage_model=args.late_stage_model,
+                        toa_perturb = args.toa_perturb, model_transmission=args.model_transmission).cuda()
+    loss_fcn = getattr(metrics, args.loss) #Get loss function from metrics.py
     gt_audio = D.RIRs[:, :R.RIR_length]
-    train_indices = D.train_indices
-
 
 
     """
@@ -256,39 +289,46 @@ if __name__=="__main__":
         print("Loading Paths from\t" + args.load_dir)
 
         #Initialize Listeners
-        Ls = initialize(train_indices=D.train_indices, listener_xyzs=D.xyzs, source_xyz=D.speaker_xyz, n_surfaces=len(D.all_surfaces), load_dir=args.load_dir)
+        Ls = initialize(indices=D.train_indices,
+                        listener_xyzs=D.xyzs,
+                        source_xyz=D.speaker_xyz,
+                        n_surfaces=len(D.all_surfaces),
+                        load_dir=args.load_dir)
             
         if args.continue_train:
             R.load_state_dict(torch.load(os.path.join(args.save_dir,"weights.pt"))['model_state_dict'])
 
-        losses = train_loop(R=R, Ls=Ls, train_gt_audio=gt_audio[train_indices], D=D,
-                            n_epochs = args.n_epochs, batch_size = batch_size, lr = args.lr, loss_fcn = loss_fcn,
+        losses = train_loop(R=R, Ls=Ls, train_gt_audio=gt_audio[D.train_indices], D=D,
+                            n_epochs = args.n_epochs, batch_size = args.batch_size, lr = args.lr, loss_fcn = loss_fcn,
                             save_dir=args.save_dir,
-                            pink_noise_supervision = args.pink_noise_supervision, pink_start_epoch=args.pink_start_epoch,
-                            continue_train = args.continue_train)
+                            pink_noise_supervision = args.pink_noise_supervision,
+                            pink_start_epoch=args.pink_start_epoch,
+                            continue_train = args.continue_train, fs=args.fs)
 
     else:
         R.load_state_dict(torch.load(os.path.join(args.save_dir,"weights.pt"))['model_state_dict'])
         R.train = False
+        R.toa_perturb = False
 
     
-
-
 
     """
     Inference, rendering RIRs
     """
+    R.train = False
     R.toa_perturb = False
     pred_dir = os.path.join(args.save_dir, "predictions")
     if not args.skip_inference:
-        pred_rirs = inference(R=R, source_xyz=D.speaker_xyz, xyzs=D.xyzs, mode=args.mode, load_dir=args.load_dir)
+        pred_rirs = inference(R=R, source_xyz=D.speaker_xyz, xyzs=D.xyzs, load_dir=args.load_dir)
         makedir_if_needed(pred_dir)
         np.save(os.path.join(pred_dir, "pred_rirs.npy"), pred_rirs)
 
         if not args.skip_music:
-            pred_music = evaluate.render_music(pred_rirs, D.music_dls, save_path=pred_dir)
+            pred_music = evaluate.render_music(pred_rirs, D.music_dls)
+            np.save(os.path.join(pred_dir,"pred_musics.npy"), pred_music)
     else:
         pred_rirs = np.load(os.path.join(pred_dir, "pred_rirs.npy"))
+        pred_music = np.load(os.path.join(pred_dir, "pred_musics.npy"))
 
 
 
@@ -338,7 +378,7 @@ if __name__=="__main__":
                                                 source_axis_1=None, source_axis_2=None,
                                                 listener_xyz=binaural_RIR_xyz,
                                                 listener_forward=D.default_binaural_listener_forward, 
-                                                istener_left=D.default_binaural_listener_left,
+                                                listener_left=D.default_binaural_listener_left,
                                                 surfaces=D.all_surfaces,
                                                 speed_of_sound=D.speed_of_sound,
                                                 parallel_surface_pairs=D.parallel_surface_pairs,
