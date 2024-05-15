@@ -42,7 +42,7 @@ Before using DIFFRIR, you will need to edit config.py so that these paths point 
 ## Training and Evaluation
 The three necessary arguments to the training script ```train.py``` are 
 1. The path where the model's weights and renderings should be saved
-2. The name of the dataset (e.g. "classroomBase") as specified in rooms.dataset.py
+2. The name of the dataset (e.g. ```"classroomBase"```) as specified in ```rooms/dataset.py```
 3. The path to the directory of pretraced reflection paths (these are included in the github).
 
 For example, to train and evaluate DIFFRIR on the Classroom Base dataset, simply run:
