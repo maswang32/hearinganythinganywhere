@@ -17,7 +17,7 @@ Code for the DIFFRIR model presenting in Hearing Anything Anywhere. Please conta
 config.py contains a list of paths to the data for different subdatasets. Before using DIFFRIR, you will need to edit config.py so that these paths point to the correct datasets on your machine 
 
 
-## Training Model
+## Training and Evaluation
 The three necessary arguments to the training script are 
 1. The path where the model's weights and renderings should be saved
 2. The name of the dataset (e.g. "classroomBase") as specified in rooms.dataset.py
