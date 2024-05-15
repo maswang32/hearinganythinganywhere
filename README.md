@@ -53,7 +53,9 @@ python train.py models/classroomBase classroomBase precomputed/classroomBase
 In the above example:
 1. The weights and training losses of the model will be saved in ```models/classroomBase```,
 2. In ```models/classroomBase/predictions```, the predicted RIRs for the locations in the dataset, the predicted music renderings, and the predicted binaural RIRs and music for the binaural datapoints in the dataset will be saved.
-3. ```models/classroomBase/predictions``` will contain ```(N,)``` numpy arrays specifiying the per-datapoint error for monoaural RIR and music rendering.
+3. ```models/classroomBase/predictions``` will contain ```(N,)``` numpy arrays specifiying the per-datapoint error for monoaural RIR rendering.
+4. ```models/classroomBase/predictions``` will contain ```(N,K)``` numpy arrays specifiying the per-datapoint, per-song error for monoaural music rendering.
+
 
 ## Tracing Paths
 The precomputed directory contains traced paths for all of the subdatasets used, but in case you would like to retrace (perhaps to a different order), you can use trace.py:
