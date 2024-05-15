@@ -55,4 +55,4 @@ The precomputed directory contains traced paths for all of, but in case you woul
 ```
 python trace.py precomputed/classroomBase classroomBase
 ```
-The above command will trace the classroomBase dataset to its default reflection order(s), and save the results in precomputed/classroomBase.
+The above command will trace the classroomBase dataset to its default reflection order(s), and save the results in ```precomputed/classroomBase```.
