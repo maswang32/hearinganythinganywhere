@@ -18,7 +18,7 @@ config.py contains a list of paths to the data for different subdatasets. Before
 
 
 ## Training and Evaluation
-The three necessary arguments to the training script are 
+The three necessary arguments to the training script ```train.py``` are 
 1. The path where the model's weights and renderings should be saved
 2. The name of the dataset (e.g. "classroomBase") as specified in rooms.dataset.py
 3. The path to the directory of pretraced reflection paths (these are included in the github).
