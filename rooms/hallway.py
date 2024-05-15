@@ -92,7 +92,7 @@ max_axial_order = 50
 #gt speaker - speaker_xyz = np.array([63*cm, (1042.1)*cm, 45*cm])
 base_train_indices = [5, 58, 99, 148, 203, 241, 296, 342, 384, 441, 482, 535]
 BaseDataset = dataset.Dataset(
-    load_dir = "Hallway/hallwayBase",
+    load_dir = config.hallwayBase_path,
     speaker_xyz = np.array([ 0.6870, 10.2452,  0.5367]), #error 20 cm from manual measurement
     all_surfaces = walls,
     speed_of_sound = speed_of_sound,
@@ -110,7 +110,7 @@ alt_config_train_indices = [5, 10, 15, 16, 35, 25, 44, 42, 48, 57, 62, 67]
 alt_valid_indices = dataset.compute_complement_indices(alt_config_train_indices, 72)[::2]
 
 RotationDataset = dataset.Dataset(
-    load_dir = "Hallway/hallwayRotation",
+    load_dir = config.hallwayRotation_path,
     speaker_xyz = np.array([ 0.5091, 10.4333,  0.5464]), #error 15.5 cm
     all_surfaces = walls,
     speed_of_sound = speed_of_sound,
@@ -125,7 +125,7 @@ RotationDataset = dataset.Dataset(
 
 #gt translated speaker - [121*cm, (746+998.5)*cm, 45*cm]
 TranslationDataset = dataset.Dataset(
-    load_dir = "Hallway/hallwayTranslation",
+    load_dir = config.hallwayTranslation_path,
     speaker_xyz = np.array([ 1.2120, 17.1969,  0.5444]), #26.5 cm error
     all_surfaces = walls,
     speed_of_sound = speed_of_sound,
@@ -139,7 +139,7 @@ TranslationDataset = dataset.Dataset(
 )
 
 PanelDataset1 = dataset.Dataset(
-    load_dir = "Hallway/hallwayPanel1",
+    load_dir = config.hallwayPanel1_path,
     speaker_xyz = np.array([ 0.6549, 10.2356,  0.4618]), #19 cm error
     all_surfaces = walls + [panel_1],
     speed_of_sound = speed_of_sound,
@@ -154,7 +154,7 @@ PanelDataset1 = dataset.Dataset(
 
 
 PanelDataset2 = dataset.Dataset(
-    load_dir = "Hallway/hallwayPanel2",
+    load_dir = config.hallwayPanel2_path,
     speaker_xyz = np.array([ 0.5002, 10.1438,  0.3348]), #32 cm error
     all_surfaces = walls + [panel_2],
     speed_of_sound = speed_of_sound,
@@ -168,7 +168,7 @@ PanelDataset2 = dataset.Dataset(
 )
 
 PanelDataset3 = dataset.Dataset(
-    load_dir = "Hallway/hallwayPanel3",
+    load_dir = config.hallwayPanel3_path,
     speaker_xyz = np.array([0.4746, 9.9688, 0.2613]), # 51 cm error
     all_surfaces =  walls + [panel_2, config_3_panel_1],
     speed_of_sound = speed_of_sound,

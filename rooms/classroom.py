@@ -81,6 +81,6 @@ BaseDataset = dataset.Dataset(
    parallel_surface_pairs=[[0,1], [2,3], [4,5]],
    train_indices = train_indices,
    valid_indices = valid_indices,
-   max_order = 5
+   max_order = 5,
    max_axial_order = 10
 )

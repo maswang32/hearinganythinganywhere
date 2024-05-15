@@ -303,8 +303,8 @@ BaseDataset = dataset.Dataset(
     default_binaural_listener_forward = np.array([0,1,0]),
     default_binaural_listener_left = np.array([-1,0,0]),
     parallel_surface_pairs = parallel_surface_pairs,
-    train_indices_base = train_indices_base,
-    valid_indices_base = valid_indices_base,
+    train_indices = train_indices_base,
+    valid_indices = valid_indices_base,
     max_order = max_order,
     max_axial_order = max_axial_order
 )
