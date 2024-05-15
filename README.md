@@ -18,6 +18,14 @@ config.py contains a list of paths to the data for different subdatasets. Before
 
 
 ## Training Model
+The three necessary arguments to the training script are 
+1. The path where the model's weights and renderings should be saved
+2. The name of the dataset (e.g. "classroomBase") as specified in rooms.dataset.py
+3. The path to the directory of pretraced reflection paths (these are included in the github).
+
+For example, to train and evaluate DIFFRIR on the Classroom Base dataset, simply run:
 ```
-python train.py /viscam/projects/audio_nerf/test_code_release/models/classroomBase classroomBase precomputed/classroomBase
+python train.py models/classroomBase classroomBase precomputed/classroomBase
 ```
+
+## Tracing Paths
