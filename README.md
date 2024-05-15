@@ -49,9 +49,11 @@ For example, to train and evaluate DIFFRIR on the Classroom Base dataset, simply
 ```
 python train.py models/classroomBase classroomBase precomputed/classroomBase
 ```
-In ```models/classroomBase```, the weights and training losses of the model will be saved. In ```models/classroomBase/predictions```, the predicted RIRs for the locations in the dataset, the predicted music renderings, and the predicted binaural RIRs and music for the binaural datapoints in the dataset are saved.
 
-In addition, ```models/classroomBase/predictions``` contains ```(N,)``` .npy arrays specifiying the error for each datapoint for monoaural and binaural music rendering.
+In the above example:
+1. The weights and training losses of the model will be saved in ```models/classroomBase```,
+2. In ```models/classroomBase/predictions```, the predicted RIRs for the locations in the dataset, the predicted music renderings, and the predicted binaural RIRs and music for the binaural datapoints in the dataset are saved.
+3. ```models/classroomBase/predictions``` will contain ```(N,)``` .npy arrays specifiying the error for each datapoint for monoaural and binaural music rendering.
 
 ## Tracing Paths
 The precomputed directory contains traced paths for all of the subdatasets used, but in case you would like to retrace (perhaps to a different order), you can use trace.py:
