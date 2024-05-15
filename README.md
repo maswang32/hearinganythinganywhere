@@ -12,13 +12,21 @@ Code for the DIFFRIR model presenting in Hearing Anything Anywhere. Please conta
 
 ## Organization
 ```precomputed``` - folder of precomputed reflection paths for all datasets, computed up to their default order
+
 ```rooms``` - information on the geometry of each room, also contains ```dataset.py```, which is used for loading data.
+
 ```binauralize.py``` - tools used for binaural rendering
+
 ```config.py``` - used to link the dataset
+
 ```evaluate.py``` - tools used to evaluate renderings and render music
+
 ```metrics.py``` - loss functions and evaluation metrics
+
 ```render.py``` - the DIFFRIR renderer, used to render RIRs.
+
 ```train.py``` - Training script, will train a DIFFRIR renderer on the specified dataset, save its outputs, and evaluate it.
+
 ```trajectory.py``` - Used for rendering trajectories, e.g., simulating walking through a room while audio is playing
 
 ## Downloading our Dataset
