@@ -34,7 +34,9 @@ Code for the DIFFRIR model presenting in Hearing Anything Anywhere. Please conta
 
 ## Linking the Dataset
 
-config.py contains a list of paths to the data for different subdatasets. Before using DIFFRIR, you will need to edit config.py so that these paths point to the correct datasets on your machine 
+config.py contains a list of paths to the data directories for different subdatasets. Each data directory should contain ```RIRs.npy```, ```xyzs.npy```, etc.
+
+Before using DIFFRIR, you will need to edit config.py so that these paths point to the correct datasets on your machine.
 
 
 ## Training and Evaluation
