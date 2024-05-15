@@ -51,7 +51,7 @@ python train.py models/classroomBase classroomBase precomputed/classroomBase
 ```
 
 ## Tracing Paths
-The precomputed directory contains traced paths for all of, but in case you would like to retrace (perhaps to a different order), you can use trace.py:
+The precomputed directory contains traced paths for all of the subdatasets used, but in case you would like to retrace (perhaps to a different order), you can use trace.py:
 ```
 python trace.py precomputed/classroomBase classroomBase
 ```
