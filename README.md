@@ -30,6 +30,7 @@ Code for the DIFFRIR model presented in Hearing Anything Anywhere. Please contac
 ```trajectory.py``` - Used for rendering trajectories, e.g., simulating walking through a room while audio is playing
 
 ## Downloading our Dataset
+The dataset can be downloaded from zenodo: https://zenodo.org/records/11195833
 
 
 ## Linking the Dataset
