@@ -62,7 +62,7 @@ class Dataset:
         self.bin_xyzs = np.load(os.path.join(load_dir, "bin_xyzs.npy"), mmap_mode='r')
         self.bin_RIRs = np.load(os.path.join(load_dir, "bin_RIRs.npy"), mmap_mode='r')
         self.bin_music = np.load(os.path.join(load_dir, "bin_music.npy"), mmap_mode='r')
-        self.mic_numbers = np.load(os.path.join(load_dir, "raw/mic_numbers.npy"))
+        self.mic_numbers = np.load(os.path.join(load_dir, "mic_numbers.npy"))
 
         #indices
         self.train_indices = train_indices
