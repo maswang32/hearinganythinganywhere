@@ -306,7 +306,9 @@ BaseDataset = dataset.Dataset(
     train_indices = train_indices_base,
     valid_indices = valid_indices_base,
     max_order = max_order,
-    max_axial_order = max_axial_order
+    max_axial_order = max_axial_order,
+    n_data = 408
+
 )
 
 
@@ -324,7 +326,8 @@ RotationDataset = dataset.Dataset(
     train_indices = train_indices_132,
     valid_indices = valid_indices_132,
     max_order = max_order,
-    max_axial_order = max_axial_order
+    max_axial_order = max_axial_order,
+    n_data = 132
 )
 
 TranslationDataset = dataset.Dataset(
@@ -338,5 +341,7 @@ TranslationDataset = dataset.Dataset(
     train_indices = train_indices_132,
     valid_indices = valid_indices_132,
     max_order = max_order,
-    max_axial_order = max_axial_order
+    max_axial_order = max_axial_order,
+    n_data = 132
+
 )

@@ -82,5 +82,6 @@ BaseDataset = dataset.Dataset(
    train_indices = train_indices,
    valid_indices = valid_indices,
    max_order = 5,
-   max_axial_order = 10
+   max_axial_order = 10,
+   n_data = 630
 )

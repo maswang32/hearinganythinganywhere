@@ -102,7 +102,9 @@ BaseDataset = dataset.Dataset(
     train_indices = base_train_indices, #Yea!
     valid_indices = dataset.compute_complement_indices(base_train_indices + list(np.arange(288)*2), 576)[::2],
     max_order = max_order,
-    max_axial_order = max_axial_order
+    max_axial_order = max_axial_order,
+    n_data = 576
+
 )
 
 
@@ -120,7 +122,8 @@ RotationDataset = dataset.Dataset(
     train_indices = alt_config_train_indices,
     valid_indices = alt_valid_indices,
     max_order = max_order,
-    max_axial_order = max_axial_order
+    max_axial_order = max_axial_order,
+    n_data = 72
 )
 
 #gt translated speaker - [121*cm, (746+998.5)*cm, 45*cm]
@@ -135,7 +138,8 @@ TranslationDataset = dataset.Dataset(
     train_indices = alt_config_train_indices,
     valid_indices = alt_valid_indices,
     max_order = max_order,
-    max_axial_order = max_axial_order
+    max_axial_order = max_axial_order,
+    n_data = 72
 )
 
 PanelDataset1 = dataset.Dataset(
@@ -149,7 +153,8 @@ PanelDataset1 = dataset.Dataset(
     train_indices = alt_config_train_indices,
     valid_indices = alt_valid_indices,
     max_order = max_order,
-    max_axial_order = max_axial_order
+    max_axial_order = max_axial_order,
+    n_data = 72
 )
 
 
@@ -164,7 +169,8 @@ PanelDataset2 = dataset.Dataset(
     train_indices = alt_config_train_indices,
     valid_indices = alt_valid_indices,
     max_order = max_order,
-    max_axial_order = max_axial_order
+    max_axial_order = max_axial_order,
+    n_data = 72
 )
 
 PanelDataset3 = dataset.Dataset(
@@ -178,5 +184,6 @@ PanelDataset3 = dataset.Dataset(
     train_indices = alt_config_train_indices,
     valid_indices = alt_valid_indices,
     max_order = max_order,
-    max_axial_order = max_axial_order
+    max_axial_order = max_axial_order,
+    n_data = 72
 )

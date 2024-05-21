@@ -43,7 +43,8 @@ class Dataset:
                 train_indices,
                 valid_indices,
                 max_order,
-                max_axial_order):
+                max_axial_order,
+                n_data):
 
         #More stuff
         self.speaker_xyz = speaker_xyz
@@ -52,27 +53,29 @@ class Dataset:
         self.default_binaural_listener_forward = default_binaural_listener_forward
         self.default_binaural_listener_left = default_binaural_listener_left
         self.parallel_surface_pairs = parallel_surface_pairs
-
-        #Stuff from load_dir
-        self.xyzs = np.load(os.path.join(load_dir, "xyzs.npy"))
-        self.RIRs = np.load(os.path.join(load_dir, "RIRs.npy"))
-        self.music = np.load(os.path.join(load_dir, "music.npy"), mmap_mode='r')
-        self.music_dls = np.load(os.path.join(load_dir, "music_dls.npy"), mmap_mode='r')
-        self.bin_music_dls = np.load(os.path.join(load_dir, "bin_music_dls.npy"), mmap_mode='r') #!@#$
-        self.bin_xyzs = np.load(os.path.join(load_dir, "bin_xyzs.npy"), mmap_mode='r')
-        self.bin_RIRs = np.load(os.path.join(load_dir, "bin_RIRs.npy"), mmap_mode='r')
-        self.bin_music = np.load(os.path.join(load_dir, "bin_music.npy"), mmap_mode='r')
-        self.mic_numbers = np.load(os.path.join(load_dir, "mic_numbers.npy"))
+        self.load_dir = load_dir
 
         #indices
         self.train_indices = train_indices
         self.valid_indices = valid_indices
-        self.test_indices = compute_complement_indices( list(self.train_indices)+list(self.valid_indices), self.xyzs.shape[0])
-
+        self.test_indices = compute_complement_indices( list(self.train_indices)+list(self.valid_indices), n_data)
 
         # Default max order and axial order
         self.max_order = max_order
         self.max_axial_order = max_axial_order
+
+    def load_data(self):
+        self.xyzs = np.load(os.path.join(self.load_dir, "xyzs.npy"))
+        self.RIRs = np.load(os.path.join(self.load_dir, "RIRs.npy"))
+        self.music = np.load(os.path.join(self.load_dir, "music.npy"), mmap_mode='r')
+        self.music_dls = np.load(os.path.join(self.load_dir, "music_dls.npy"), mmap_mode='r')
+        self.bin_music_dls = np.load(os.path.join(self.load_dir, "bin_music_dls.npy"), mmap_mode='r') #!@#$
+        self.bin_xyzs = np.load(os.path.join(self.load_dir, "bin_xyzs.npy"), mmap_mode='r')
+        self.bin_RIRs = np.load(os.path.join(self.load_dir, "bin_RIRs.npy"), mmap_mode='r')
+        self.bin_music = np.load(os.path.join(self.load_dir, "bin_music.npy"), mmap_mode='r')
+        self.mic_numbers = np.load(os.path.join(self.load_dir, "mic_numbers.npy"))
+
+
 
 
 
@@ -89,7 +92,7 @@ def dataLoader(name):
     if name[:9] == "classroom":
         import rooms.classroom as classroom
         if name=="classroomBase":
-            return classroom.BaseDataset
+            D = classroom.BaseDataset
         else:
             raise ValueError('Invalid Dataset Name')
 
@@ -97,41 +100,44 @@ def dataLoader(name):
     elif name[:8] == "dampened":
         import rooms.dampened as dampened
         if name =="dampenedBase":
-            return dampened.BaseDataset
+            D = dampened.BaseDataset
         elif name =="dampenedRotation":
-            return dampened.RotationDataset
+            D = dampened.RotationDataset
         elif name =="dampenedTranslation":
-            return dampened.TranslationDataset
+            D =  dampened.TranslationDataset
         elif name == "dampenedPanel":
-            return dampened.PanelDataset
+            D = dampened.PanelDataset
         else:
             raise ValueError('Invalid Dataset Name')
     #Hallway Datasets
     elif name[:7] == "hallway":
         import rooms.hallway as hallway
         if name == "hallwayBase":
-            return hallway.BaseDataset
+            D = hallway.BaseDataset
         elif name == "hallwayRotation":
-            return hallway.RotationDataset
+            D = hallway.RotationDataset
         elif name == "hallwayTranslation":
-            return hallway.TranslationDataset
+            D =  hallway.TranslationDataset
         elif name == "hallwayPanel1":
-            return hallway.PanelDataset1
+            D =  hallway.PanelDataset1
         elif name == "hallwayPanel2":
-            return hallway.PanelDataset2
+            D =  hallway.PanelDataset2
         elif name == "hallwayPanel3":
-            return hallway.PanelDataset3
+            D = hallway.PanelDataset3
         else:
             raise ValueError('Invalid Dataset Name')
     elif name[:7] == "complex":
         import rooms.complex as complex
         if name == "complexBase":
-            return complex.BaseDataset
+            D = complex.BaseDataset
         elif name == "complexRotation":
-            return complex.RotationDataset
+            D = complex.RotationDataset
         elif name == "complexTranslation":
-            return complex.TranslationDataset
+            D = complex.TranslationDataset
         else:
             raise ValueError('Invalid Dataset Name')
     else:
         raise ValueError('Invalid Dataset Name')
+
+    D.load_data()
+    return D

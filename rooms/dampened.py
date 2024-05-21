@@ -86,7 +86,8 @@ BaseDataset = dataset.Dataset(
     train_indices = train_indices_base,
     valid_indices = valid_indices_base,
     max_order = max_order,
-    max_axial_order = max_axial_order
+    max_axial_order = max_axial_order,
+    n_data = 276
 )
 
 train_indices_120 = np.append((np.arange(11)*11), 109)
@@ -104,7 +105,8 @@ RotationDataset = dataset.Dataset(
     train_indices = train_indices_120,
     valid_indices = valid_indices_120,
     max_order = max_order,
-    max_axial_order = max_axial_order
+    max_axial_order = max_axial_order,
+    n_data = 120
 )
 
 
@@ -122,7 +124,8 @@ TranslationDataset = dataset.Dataset(
     train_indices = train_indices_120,
     valid_indices = valid_indices_120,
     max_order = max_order,
-    max_axial_order = max_axial_order
+    max_axial_order = max_axial_order,
+    n_data = 120
 )
 
 
@@ -142,5 +145,6 @@ PanelDataset = dataset.Dataset(
     train_indices = train_indices_panel,
     valid_indices = valid_indices_panel,
     max_order = max_order,
-    max_axial_order = max_axial_order
+    max_axial_order = max_axial_order,
+    n_data = 252
 )
