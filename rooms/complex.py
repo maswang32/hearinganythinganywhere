@@ -311,7 +311,7 @@ BaseDataset = dataset.Dataset(
 
 
 train_indices_132 = [11,  13,  29,  43,  54,  60,  82,  87, 100, 116, 122, 141-12]
-valid_indices_132 = compute_complement_indices(train_indices_132, 132)[::2]
+valid_indices_132 = dataset.compute_complement_indices(train_indices_132, 132)[::2]
 
 RotationDataset = dataset.Dataset(
     load_dir = config.complexRotation_path,
