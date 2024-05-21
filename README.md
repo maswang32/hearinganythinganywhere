@@ -71,7 +71,9 @@ The above command will trace the classroomBase dataset to its default reflection
 @article{hearinganythinganywhere2024,
   title={Hearing Anything Anywhere},
   author={Mason Wang and Ryosuke Sawata and Samuel Clarke and Ruohan Gao and Elliott Wu and Jiajun Wu},
+  journal={Arkiv},
   year={2024},
-  booktitle={Arkiv},
 }
+
+
 ```
