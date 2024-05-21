@@ -124,7 +124,6 @@ def train_loop(R, Ls, train_gt_audio, D = None,
             optimizer.zero_grad()
 
             for idx in curr_indices:
-                print(idx)
 
                 output = R.render_RIR(Ls[idx])
                 loss = loss_fcn(output, train_gt_audio[idx])
