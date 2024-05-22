@@ -134,7 +134,7 @@ def train_loop(R, Ls, train_gt_audio, D = None,
                     pink_noise = generate_pink_noise(5*fs, fs=fs)
                     convolved_pred = F.fftconvolve(output, pink_noise)[...,:5*fs]
                     convolved_gt =  F.fftconvolve(train_gt_audio[idx,:R.RIR_length], pink_noise)[...,:5*fs]
-                    pink_noise_loss = loss_fcn(convolved_pred, convolved_gt, tiny_hop=False)
+                    pink_noise_loss = loss_fcn(convolved_pred, convolved_gt)
                     loss += pink_noise_loss*0.2
                 
                 loss.backward()
