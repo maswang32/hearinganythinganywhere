@@ -8,5 +8,6 @@ __pycache__/
 # Ignore error files, and prediction files
 **/errors/
 **/predictions/
+**/losses.npy
 
 example_trajectories/**/
