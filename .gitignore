@@ -3,4 +3,10 @@ __pycache__/
 # Ignore Python compiled files
 *.pyc
 *.pyo
+.git
 
+# Ignore error files, and prediction files
+**/errors/
+**/predictions/
+
+example_trajectories/**/
