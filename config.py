@@ -18,6 +18,10 @@ complexRotation_path = "/viscam/projects/audio_nerf/datasets/release/Complex/com
 complexTranslation_path = "/viscam/projects/audio_nerf/datasets/release/Complex/complexTranslation"
 
 # Path to music files used for demos
-music_files_for_trajectory_path = "/viscam/projects/audio_nerf/masonstuff/trajectories/musicfiles"
+music_files_for_trajectory_path = "/viscam/projects/audio_nerf/code_release/example_trajectories/source_audios"
+
+
+# Path to HRIRs
+HRIR_dataset_dir = "/viscam/projects/audio_nerf/code_release/HRIRs"
 
 

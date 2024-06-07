@@ -1,11 +1,13 @@
 import numpy as np
 import torch
+import os
 import scipy.io.wavfile
 import plotly.graph_objects as go
 import trace
 import render
+import config
 
-HRIR_dataset_dir = "HRIRs/azi_"
+HRIR_dataset_dir = config.HRIR_dataset_dir
 
 def get_HRIR(azimuth, elevation):
     """
@@ -67,7 +69,7 @@ def get_HRIR(azimuth, elevation):
             suffix = "90,0.wav"
 
     azimuth = str(int(np.round(azimuth) % 360))
-    path = HRIR_dataset_dir + azimuth + ",0_ele_" + suffix
+    path = os.path.join(HRIR_dataset_dir, "azi_" + azimuth + ",0_ele_" + suffix)
     _, hrir = scipy.io.wavfile.read(path)
 
     # 32 bit - convert to float

@@ -92,14 +92,14 @@ class Trajectory:
             plot_surface(surface)
 
         if listener_xyz is not None:
-            plt.scatter(listener_xyz[0], listener_xyz[1])
+            plt.scatter(listener_xyz[0], listener_xyz[1], label="Listener Locations")
             plt.arrow(listener_xyz[0],listener_xyz[1],listener_forward[0],listener_forward[1],
                       color='red',head_width=0.1,label="Listener Direction")
             plt.arrow(listener_xyz[0],listener_xyz[1],listener_left[0],listener_left[1],
                       color='green', head_width=0.1)
 
         if source_xyz is not None:
-            plt.scatter(source_xyz[0], source_xyz[1])
+            plt.scatter(source_xyz[0], source_xyz[1], label="Speaker Location")
             plt.arrow(source_xyz[0],source_xyz[1],source_axis_1[0],source_axis_1[1],
                       color='orange',head_width=0.1,label="Source Direction")
             plt.arrow(source_xyz[0],source_xyz[1],source_axis_2[0],source_axis_2[1],
@@ -236,20 +236,16 @@ class Trajectory:
         self.rirs = rirs
         return rirs
 
-    def convolve_audio(self, source_file, cutoff=1440000): #1897920
+    def convolve_audio(self, source_file, cutoff=None): #1897920 for 40s, 1440000 for 30s
 
         """
         Convolves RIRs with audio
-        
-        
-        
         """
 
         if self.rirs is None:
             print("Error: RIRs not initialized")
             return
         
-        print('bruh')
 
         fs, source = scipy.io.wavfile.read(os.path.join(config.music_files_for_trajectory_path, source_file))
         if cutoff is not None:
