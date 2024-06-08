@@ -8,7 +8,7 @@ import trace
 import binauralize
 import rooms.dataset
 import config
-
+ 
 class Trajectory:
 
     """
@@ -271,7 +271,7 @@ class Trajectory:
 
         return convolved
     
-    def fill(self, source_file, fade_length=20000):
+    def fill(self, source_file, fade_length=5):
         
         convolved = self.convolves[source_file]
         total_length = convolved.shape[-1]

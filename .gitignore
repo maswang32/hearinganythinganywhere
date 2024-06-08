@@ -10,4 +10,6 @@ __pycache__/
 **/predictions/
 **/losses.npy
 
+# Ignore rendered trajectory temp files
 example_trajectories/**/
+!example_trajectories/source_audios/
