@@ -11,6 +11,13 @@ Code for the DIFFRIR model presented in Hearing Anything Anywhere. Please contac
 
 
 ## Organization
+
+```HRIRs``` - the SADIE dataset of Head-Related Room Impulse Responses, which are used to render binaural audio.
+
+```example_trajectories``` - 3 notebooks used for generating example trajectories using trajectory.py, which are on the website. Includes a hallway, dampened room, and virtual speaker rotation example. Also contains audio files you can simulate in the room.
+
+```models``` - weights for pretrained models in each of the four base subdatasets.
+
 ```precomputed``` - folder of precomputed reflection paths for all datasets, computed up to their default order
 
 ```rooms``` - information on the geometry of each room, also contains ```dataset.py```, which is used for loading data.
@@ -38,6 +45,10 @@ The dataset can be downloaded from zenodo: https://zenodo.org/records/11195833
 ```config.py``` contains a list of paths to the data directories for different subdatasets. Each data directory should contain ```RIRs.npy```, ```xyzs.npy```, and so on.
 
 Before using DIFFRIR, you will need to edit ```config.py``` so that these paths point to the correct directories on your machine.
+
+
+## Rendering Trajectories
+There are three example notebooks in the example_trajectories directory that show you how to generate realistic, immersive audio in a room.
 
 
 ## Training and Evaluation
