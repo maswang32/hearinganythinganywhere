@@ -81,7 +81,7 @@ The above command will trace the classroomBase dataset to its default reflection
 ```
 @InProceedings{hearinganythinganywhere2024,
   title={Hearing Anything Anywhere},
-  author={Mason Wang and Ryosuke Sawata and Samuel Clarke and Ruohan Gao and Elliott Wu and Jiajun Wu},
+  author={Mason Wang and Ryosuke Sawata and Samuel Clarke and Ruohan Gao and Shangzhe Wu and Jiajun Wu},
   booktitle={CVPR},
   year={2024}}
 
