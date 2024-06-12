@@ -1,6 +1,6 @@
 # Hearing Anything Anywhere - CVPR 2024
 
-### [Project Page](https://masonlwang.com/hearinganythinganywhere) | [Video](https://www.youtube.com/watch?v=Cv9oOFVXem4) | [Paper](https://masonlwang.com/hearinganythinganywhere/hearing_anything_anywhere.pdf) | [Data](https://zenodo.org/records/11195833)
+### [Project Page](https://masonlwang.com/hearinganythinganywhere) | [Video](https://www.youtube.com/watch?v=Cv9oOFVXem4) | [Paper](https://arxiv.org/pdf/2406.07532) | [Data](https://zenodo.org/records/11195833)
 
 Code for the DIFFRIR model presented in Hearing Anything Anywhere. Please contact Mason Wang at masonlwang32 at gmail dot com for any inquiries or issues.
 
