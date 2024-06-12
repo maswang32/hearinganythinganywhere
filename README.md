@@ -65,8 +65,8 @@ python train.py models/classroomBase classroomBase precomputed/classroomBase
 In the above example:
 1. The weights and training losses of the model will be saved in ```models/classroomBase```,
 2. In ```models/classroomBase/predictions```, the predicted RIRs for the monoaural locations in the dataset, the predicted music renderings, and the predicted binaural RIRs and music for the binaural datapoints in the dataset will be saved.
-3. ```models/classroomBase/predictions``` will contain ```(N,)``` numpy arrays specifiying the per-datapoint error for monoaural RIR rendering.
-4. ```models/classroomBase/predictions``` will contain ```(N,K)``` numpy arrays specifiying the per-datapoint, per-song error for monoaural music rendering.
+3. ```models/classroomBase/predictions``` will contain ```(N,)``` numpy arrays specifying the per-datapoint error for monoaural RIR rendering.
+4. ```models/classroomBase/predictions``` will contain ```(N,K)``` numpy arrays specifying the per-datapoint, per-song error for monoaural music rendering.
 
 
 ## Tracing Paths
