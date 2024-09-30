@@ -1,6 +1,6 @@
 import numpy as np
 import config
-import trace as G
+import trace1 as G
 import rooms.dataset as dataset
 
 

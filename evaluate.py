@@ -35,7 +35,7 @@ def render_music(pred_rirs, music_sources, rir_length=96000, length=10*48000, de
     Parameters
     ----------
     pred_rirs: 2-dim array (N,T)
-    music_sources: music source files, usually the direct-line recordings. (N,T2)
+    music_sources: music source files, usually the direct-line recordings. (N,T2)?????????and the number of songs????
     rir_length: length to truncate RIRs to
     length: length to truncate music to after rendering
 
@@ -53,7 +53,7 @@ def render_music(pred_rirs, music_sources, rir_length=96000, length=10*48000, de
                                         music_sources[i,:].to(device))[...,:length].cpu()
 
     torch.cuda.empty_cache()
-    return pred_musics.numpy()
+    return pred_musics.detach().numpy()#############?????????non c'era detach
 
 
 def eval_music(pred_music, gt_music, metric, length=10*48000, device='cuda:0'):

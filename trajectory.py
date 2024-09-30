@@ -4,7 +4,7 @@ import scipy
 import matplotlib.pyplot as plt
 import torch
 import torchaudio.functional as F
-import trace
+import trace1
 import binauralize
 import rooms.dataset
 import config
@@ -158,7 +158,7 @@ class Trajectory:
 
 
             reflection_path_indices, transmission_path_indices, delays, start_directions, end_directions = (
-                trace.get_reflections_transmissions_and_delays(source=source,
+                trace1.get_reflections_transmissions_and_delays(source=source,
                 dest=dest, surfaces=self.surfaces, speed_of_sound=self.speed_of_sound,
                 max_order=max_order, candidate_transmission_surface_indices=None,
                 img_save_dir=None, parallel_surface_pairs=self.D.parallel_surface_pairs, max_axial_order=max_axial_order)

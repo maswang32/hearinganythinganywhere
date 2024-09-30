@@ -1,12 +1,12 @@
 # Paths to dataset - replace paths with YOUR paths
-classroomBase_path = "/viscam/projects/audio_nerf/datasets/release/Classroom/classroomBase"
+classroomBase_path = "../classroomBase"
 
 dampenedBase_path = "/viscam/projects/audio_nerf/datasets/release/Dampened/dampenedBase"
 dampenedRotation_path = "/viscam/projects/audio_nerf/datasets/release/Dampened/dampenedRotation"
 dampenedTranslation_path = "/viscam/projects/audio_nerf/datasets/release/Dampened/dampenedTranslation"
 dampenedPanel_path = "/viscam/projects/audio_nerf/datasets/release/Dampened/dampenedPanel"
 
-hallwayBase_path = "/viscam/projects/audio_nerf/datasets/release/Hallway/hallwayBase"
+hallwayBase_path = "../hallwayBase"
 hallwayRotation_path = "/viscam/projects/audio_nerf/datasets/release/Hallway/hallwayRotation"
 hallwayTranslation_path = "/viscam/projects/audio_nerf/datasets/release/Hallway/hallwayTranslation"
 hallwayPanel1_path = "/viscam/projects/audio_nerf/datasets/release/Hallway/hallwayPanel1"
@@ -23,5 +23,10 @@ music_files_for_trajectory_path = "/viscam/projects/audio_nerf/code_release/exam
 
 # Path to HRIRs
 HRIR_dataset_dir = "/viscam/projects/audio_nerf/code_release/HRIRs"
+
+#####################ààà
+prova_dataset_path= "../prova_dataset"
+###########################
+
 
 

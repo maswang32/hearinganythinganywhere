@@ -4,6 +4,7 @@ import scipy.signal as signal
 
 torch.set_default_dtype(torch.float32)
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+#device = "cpu"
 
 def safe_log(x, eps=1e-7):
     """
@@ -78,6 +79,93 @@ def training_loss(x,y,cutoff=9000, eps=1e-6):
     tiny_hop_loss = L1_and_Log(x[...,:cutoff], y[...,:cutoff], n_fft=256, eps=eps, hop_length=1)
     return loss1 + loss2 + loss3 + loss4 + tiny_hop_loss
 
+#########################################################à
+def simplified_loss(x,y,cutoff=9000, eps=1e-6):
+    """
+    Training Loss
+
+    Computes spectral L1 and log spectral L1 loss
+
+    Parameters
+    ----------
+    x: first audio waveform(s), torch.tensor
+    y: second audio waveform(s), torch.tensor
+    eps: added to the magnitude stft before taking the square root. Limits dynamic range of spectrogram.
+
+    Returns
+    -------
+    loss: float tensor
+    """
+    loss1 = L1_and_Log(x,y, n_fft=512, eps=eps)
+    loss4 = L1_and_Log(x,y, n_fft=4096, eps=eps)
+    return loss1 + loss4 
+###########################################################
+
+###########################################################
+def training_loss_considering_directionality(x,y, cutoff =9000, eps=1e-6):
+    """
+    Training Loss considering directionality
+
+    Computes spectral L1 and log spectral L1 loss for each direction
+
+    Parameters
+    ----------
+    x: list of dictionaries (one for each frequency_range), torch.tensor
+    y: lòist of dictionaries (one for each frequency_range), torch.tensor
+    eps: added to the magnitude stft before taking the square root. Limits dynamic range of spectrogram.
+
+    Returns
+    -------
+    loss: float tensor
+
+    """
+
+    assert len(x) == len(y), "Frequncy ranges lists have different sizes"
+    loss = 0
+    for interval in x:
+        matching_interval = next((i for i in y if i['frequency_range'] == interval['frequency_range']), None)
+
+        assert matching_interval != None, "Different frequency ranges"
+        assert len(interval['responses']) == len(matching_interval['responses']), "Different resolutions"
+        
+        for r in interval['responses']:
+            matching_r = next(i for i in matching_interval['responses'] if (i['direction'][0] == r['direction'][0] and i['direction'][1] == r['direction'][1]))
+            loss += training_loss(r['response'], matching_r['response'], cutoff=cutoff, eps=eps)
+
+
+    return loss
+
+##############################################################
+
+###########################################################
+def training_loss_for_learned_bp(x,y, cutoff =9000, eps=1e-6):
+    """
+    Training Loss considering directionality
+
+    Computes spectral L1 and log spectral L1 loss for each direction
+
+    Parameters
+    ----------
+    x: list of dictionaries (one for each direction), torch.tensor
+    y: lòist of dictionaries (one for each direction), torch.tensor
+    eps: added to the magnitude stft before taking the square root. Limits dynamic range of spectrogram.
+
+    Returns
+    -------
+    loss: float tensor
+
+    """
+
+    assert len(x) == len(y), "Different angular resolutions"
+    loss = 0
+    for r in x:
+        matching_r = next((i for i in y if i['angle'] == r['angle']), None)
+        loss += training_loss(r['t_response'], matching_r['t_response'], cutoff=cutoff, eps=eps)
+
+
+    return loss
+
+##############################################################
 
 """
 Evaluation Metrics

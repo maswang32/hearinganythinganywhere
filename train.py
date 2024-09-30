@@ -37,6 +37,7 @@ def initialize(indices, source_xyz, listener_xyzs, n_surfaces, load_dir):
     list of ListenerLocation, corresponding to indices.
     """
     Ls = []
+
     for idx in indices:
         print("Loading paths from "+ load_dir)
         reflections = np.load(os.path.join(load_dir,"reflections/"+str(idx)+".npy"), allow_pickle=True)
