@@ -1,3 +1,6 @@
+This is a modified version of the DiffRIR model that supports training with multiple source positions. Single-source training can still be performed without any changes. Multi-source training has been tested exclusively with RIRs. Additional metrics have been added for validation. trace_mp.py is an improved version for computing precomputed reflection paths and supports multiprocessing. Instructions for using DiffRIR in multi-source mode can be found in the section # Multi-Source Training and Evaluation.
+Modified by Luka Fehrmann, 2025
+
 # Hearing Anything Anywhere - CVPR 2024
 
 ### [Project Page](https://masonlwang.com/hearinganythinganywhere) | [Video](https://www.youtube.com/watch?v=Cv9oOFVXem4) | [Paper](https://arxiv.org/pdf/2406.07532) | [Data](https://zenodo.org/records/11195833)
@@ -39,6 +42,8 @@ Code for the DIFFRIR model presented in Hearing Anything Anywhere. Please contac
 ## Downloading our Dataset
 The dataset can be downloaded from zenodo: https://zenodo.org/records/11195833
 
+The dataset used for multi-source training (including RIRs.npy, xyzs.npy and precomputed reflection paths) can be downloaded from zenodo: https://zenodo.org/records/16738230
+
 
 ## Linking the Dataset
 
@@ -68,6 +73,14 @@ In the above example:
 3. ```models/classroomBase/predictions``` will contain ```(N,)``` numpy arrays specifiying the per-datapoint error for monoaural RIR rendering.
 4. ```models/classroomBase/predictions``` will contain ```(N,K)``` numpy arrays specifiying the per-datapoint, per-song error for monoaural music rendering.
 
+## Multi-Source Training and Evaluation
+
+To train the model with a dataset containing multiple source positions (e.g., ```"shoebox_multi_src6_ti3_id.py"```), the paths to the precomputed reflection paths must be specified in the same order as the sources are listed in the dataset file located at ```rooms/shoebox_multi_src6_ti3_id.py```.
+
+For the given example, simply run:
+```
+python train.py models/shoebox_multi_src6_ti3_id shoebox_multi_src6_ti3_id precomputed/shoebox_L01 precomputed/shoebox_L11 precomputed/shoebox_L21 precomputed/shoebox_L31 precomputed/shoebox_L41 precomputed/shoebox_L51
+```
 
 ## Tracing Paths
 The precomputed directory contains traced paths for all of the subdatasets used, but in case you would like to retrace (perhaps to a different order), you can use trace.py:
@@ -76,6 +89,10 @@ python trace.py precomputed/classroomBase classroomBase
 ```
 The above command will trace the classroomBase dataset to its default reflection order(s), and save the results in ```precomputed/classroomBase```.
 
+For faster computation of the reflection paths, the modified version trace_mp.py can also be used.
+```
+python trace_mp.py precomputed/classroomBase classroomBase
+```
 
 ## Citation
 ```

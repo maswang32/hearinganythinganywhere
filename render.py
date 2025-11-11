@@ -189,7 +189,7 @@ class Renderer(nn.Module):
             source_axis_3 = np.cross(source_axis_1 ,source_axis_2)
             source_basis = np.stack( (source_axis_1, source_axis_2, source_axis_3), axis=-1)
             start_directions_normalized_transformed = (
-                start_directions_normalized @ torch.Tensor(source_basis).double().cuda())
+                start_directions_normalized @ torch.Tensor(source_basis).double().to(self.device))
             dots =  start_directions_normalized_transformed @ (self.sphere_points).T
         else:
             dots = start_directions_normalized @ (self.sphere_points).T

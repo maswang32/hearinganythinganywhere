@@ -22,42 +22,62 @@ def makedir_if_needed(directory):
 
 def initialize(indices, source_xyz, listener_xyzs, n_surfaces, load_dir):
     """
-    Creates a list of ListenerLocations based on a precomputed reflections from load_dir.
-    
+    Creates a list of ListenerLocations based on precomputed reflections from one or more directories.
+
     Parameters
     ----------
-    indices: list of int (len K), of indices in the load_dir to create ListenerLocations for
-    source_xyz: (3,) np.array of the source locatoin
-    listener_xyzs: (N,3) np.array of the listener locations (ALL data points).
-    n_surface: int representing the number of surfaces
-    load_dir: directory to load precomputed reflection paths from.
+    indices: list of int (len K), global indices in the dataset
+    source_xyz: (N, 3) np.array of source locations (multiple sources supported)
+    listener_xyzs: (N,3) np.array of listener locations
+    n_surface: int, number of surfaces
+    load_dir: list of str or single str, directory/directories to load reflection paths from
 
     Returns
     -------
-    list of ListenerLocation, corresponding to indices.
+    list of ListenerLocation objects
     """
+    if isinstance(load_dir, str):
+        load_dirs = [load_dir]
+    else:
+        load_dirs = load_dir
+
+    n_data_per_source = len(listener_xyzs) // len(source_xyz) if len(source_xyz.shape) == 2 else len(listener_xyzs)
     Ls = []
     for idx in indices:
-        print("Loading paths from "+ load_dir)
-        reflections = np.load(os.path.join(load_dir,"reflections/"+str(idx)+".npy"), allow_pickle=True)
-        transmissions = np.load(os.path.join(load_dir, "transmissions/"+str(idx)+".npy"), allow_pickle=True)
-        delays = np.load(os.path.join(load_dir, "delays/"+str(idx)+".npy"))
-        start_directions = np.load(os.path.join(load_dir, "starts/"+str(idx)+".npy"))
-        end_directions = np.load(os.path.join(load_dir, "ends/"+str(idx)+".npy"))
-        L = render.ListenerLocation(source_xyz=source_xyz,
+        speaker_idx = idx // n_data_per_source
+        local_idx = idx % n_data_per_source
+        current_dir = load_dirs[speaker_idx]
+        if len(source_xyz.shape) == 2:
+            src_xyz = source_xyz[speaker_idx]
+        else:
+            src_xyz = source_xyz
+        print(f"Loading paths from {current_dir} (global_idx={idx}, speaker_idx={speaker_idx}, local_idx={local_idx})")
+        print(f"Source XYZ: {src_xyz}, Listener XYZ: {listener_xyzs[idx]}")
+
+        reflections = np.load(os.path.join(current_dir, "reflections/"+str(local_idx)+".npy"), allow_pickle=True)
+        transmissions = np.load(os.path.join(current_dir, "transmissions/"+str(local_idx)+".npy"), allow_pickle=True)
+        delays = np.load(os.path.join(current_dir, "delays/"+str(local_idx)+".npy"))
+        start_directions = np.load(os.path.join(current_dir, "starts/"+str(local_idx)+".npy"))
+        end_directions = np.load(os.path.join(current_dir, "ends/"+str(local_idx)+".npy"))
+
+        L = render.ListenerLocation(source_xyz=src_xyz,
                                     listener_xyz = listener_xyzs[idx],
-                                    n_surfaces=n_surfaces, reflections=reflections,
-                                    transmissions=transmissions, delays=delays, 
-                                    start_directions=start_directions, end_directions=end_directions)
+                                    n_surfaces=n_surfaces,
+                                    reflections=reflections,
+                                    transmissions=transmissions,
+                                    delays=delays,
+                                    start_directions=start_directions,
+                                    end_directions=end_directions)
         Ls.append(L)
     return Ls
 
 def train_loop(R, Ls, train_gt_audio, D = None,
-                n_epochs=1000, batch_size=4, lr = 1e-2, loss_fcn = None,
-                save_dir=None, 
-                pink_noise_supervision = False, pink_start_epoch=500,
+                n_epochs=200, batch_size=4, lr = 3e-2, loss_fcn = None,
+                save_dir=None,
+                pink_noise_supervision = False, pink_start_epoch=100,
                 continue_train=False,
                 fs=48000):
+                
     """
     Runs the training process
 
@@ -88,13 +108,20 @@ def train_loop(R, Ls, train_gt_audio, D = None,
     if save_dir is not None:
         makedir_if_needed(save_dir)
 
-    train_gt_audio = torch.Tensor(train_gt_audio).cuda()
+    train_gt_audio = torch.Tensor(train_gt_audio).to(device)
 
     # Lower learning rate on residual
     my_list = ['RIR_residual']
     my_params = list(map(lambda x: x[1],list(filter(lambda kv: kv[0] in my_list, R.named_parameters()))))
     base_params = list(map(lambda x: x[1],list(filter(lambda kv: kv[0] not in my_list, R.named_parameters()))))
     optimizer = torch.optim.Adam([{'params': base_params}, {'params': my_params, 'lr': 1e-4}], lr=lr)
+
+    # Linear warmup scheduler
+    def linear_warmup_lr(epoch_local):
+        warmup_epochs = 20
+        return min(1.0, float(epoch_local + 1) / float(warmup_epochs))
+
+    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=linear_warmup_lr)
 
     for name, param in R.named_parameters():
         print(name)
@@ -112,15 +139,16 @@ def train_loop(R, Ls, train_gt_audio, D = None,
 
     
     while epoch < n_epochs:
-
+            
         print(epoch, flush=True)
 
         N_train = len(Ls)
         N_iter = max(int(N_train/batch_size),1)
         rand_idx = np.random.permutation(N_train)
-
+        epoch_losses = []
+        
         for i in range(N_iter):
-            curr_indices = rand_idx[i*batch_size:(i+1)*batch_size]            
+            curr_indices = rand_idx[i*batch_size:(i+1)*batch_size]
             optimizer.zero_grad()
 
             for idx in curr_indices:
@@ -133,15 +161,23 @@ def train_loop(R, Ls, train_gt_audio, D = None,
                     print("Generating Pink Noise")
                     pink_noise = generate_pink_noise(5*fs, fs=fs)
                     convolved_pred = F.fftconvolve(output, pink_noise)[...,:5*fs]
-                    convolved_gt =  F.fftconvolve(train_gt_audio[idx,:R.RIR_length], pink_noise)[...,:5*fs]
+                    convolved_gt = F.fftconvolve(train_gt_audio[idx,:R.RIR_length], pink_noise)[...,:5*fs]
                     pink_noise_loss = loss_fcn(convolved_pred, convolved_gt)
                     loss += pink_noise_loss*0.2
-                
+                    
                 loss.backward()
-                losses.append(loss.item())
+                epoch_losses.append(loss.item())
                 print(loss.item(),flush=True)
 
             optimizer.step()
+        
+        
+        losses.extend(epoch_losses)
+        # Log current lr
+        for i, param_group in enumerate(optimizer.param_groups):
+            print(f"Learning Rate (Group {i}): {param_group['lr']}")
+
+        scheduler.step()
 
         if save_dir is not None:
             torch.save({
@@ -154,7 +190,7 @@ def train_loop(R, Ls, train_gt_audio, D = None,
     return losses
 
 
-#Note - this function relies on precomputed reflection paths
+# Note - this function relies on precomputed reflection paths
 def inference(R, source_xyz, xyzs, load_dir, source_axis_1=None, source_axis_2=None):
     """
     Render monoaural RIRs at given precomputed reflection paths.
@@ -164,42 +200,59 @@ def inference(R, source_xyz, xyzs, load_dir, source_axis_1=None, source_axis_2=N
     R: Renderer
         renderer to perform inference on
     source_xyz: np.array (3,)
-        3D location of source in meters
+        3D location of source in meters or (N,3) for multi-source
     xyzs: np.array (N, 3)
         set of listener locations to render at
-    load_dir: str
-        directory to load precomputed listener paths
+    load_dir: str or list of str
+        directory or directories to load precomputed listener paths
     source_axis_1: np.array (3,)
         first axis specifying virtual source rotation,
         default is None which is (1,0,0)
     source_axis_2: np.array (3,)
         second axis specifying virtual source rotation,
-        default is None which is (0,1,0)    
+        default is None which is (0,1,0)
 
     Returns
     -------
-    predictions: np.array (N, T) of predicted RIRs    
+    predictions: np.array (N, T) of predicted RIRs
     """
+    if isinstance(load_dir, str):
+        load_dirs = [load_dir]
+    else:
+        load_dirs = load_dir
+
+    n_data_per_source = len(xyzs) // len(source_xyz) if len(source_xyz.shape) == 2 else len(xyzs)
 
     predictions = np.zeros((xyzs.shape[0], R.RIR_length))
 
     with torch.no_grad():
         R.toa_perturb = False
         for idx in range(xyzs.shape[0]):
-            print(idx, flush=True)
-            reflections = np.load(os.path.join(load_dir, "reflections/"+str(idx)+".npy"), allow_pickle=True)
-            transmissions = np.load(os.path.join(load_dir, "transmissions/"+str(idx)+".npy"), allow_pickle=True)
-            delays = np.load(os.path.join(load_dir, "delays/"+str(idx)+".npy"),allow_pickle=True)
-            start_directions = np.load(os.path.join(load_dir, "starts/"+str(idx)+".npy"))
+            speaker_idx = idx // n_data_per_source
+            local_idx = idx % n_data_per_source
+            current_dir = load_dirs[speaker_idx]
+            if len(source_xyz.shape) == 2:
+                src_xyz = source_xyz[speaker_idx]
+            else:
+                src_xyz = source_xyz
+                
+            print(f"[inference] Loading from: {current_dir}")
+            print(f"[inference] idx: {idx}, speaker_idx: {speaker_idx}, local_idx: {local_idx}")
+            print(f"[inference] Using source: {source_xyz[speaker_idx] if len(source_xyz.shape) == 2 else source_xyz}, listener: {xyzs[idx]}")
+            reflections = np.load(os.path.join(current_dir, "reflections/"+str(local_idx)+".npy"), allow_pickle=True)
+            transmissions = np.load(os.path.join(current_dir, "transmissions/"+str(local_idx)+".npy"), allow_pickle=True)
+            delays = np.load(os.path.join(current_dir, "delays/"+str(local_idx)+".npy"), allow_pickle=True)
+            start_directions = np.load(os.path.join(current_dir, "starts/"+str(local_idx)+".npy"))
 
+            
             L = render.ListenerLocation(
-                source_xyz=source_xyz,
+                source_xyz=src_xyz,
                 listener_xyz=xyzs[idx],
                 n_surfaces=R.n_surfaces,
                 reflections=reflections,
                 transmissions=transmissions,
                 delays=delays,
-                start_directions = start_directions)
+                start_directions=start_directions)
 
             predict = R.render_RIR(L, source_axis_1=source_axis_1, source_axis_2=source_axis_2)
             predictions[idx] = predict.detach().cpu().numpy()
@@ -236,15 +289,14 @@ def generate_pink_noise(N, vol_factor = 0.04, freq_threshold=25, fs=48000):
 
 
 
-
 if __name__=="__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('save_dir', help="Where to save weights/plots")
     parser.add_argument('dataset_name', help="Name of Dataset, e.g. classroomBase")
-    parser.add_argument('load_dir', help="Where to load precomputed paths")
-
-    parser.add_argument('--n_epochs', type=int, default=1000, help="Number of training epochs")
-    parser.add_argument('--lr', type=float, default=1e-2, help="Learning Rate")
+    parser.add_argument('load_dir', nargs='+', default=None, help="Where to load precomputed paths")
+    
+    parser.add_argument('--n_epochs', type=int, default=200, help="Number of training epochs")
+    parser.add_argument('--lr', type=float, default=3e-2, help="Learning Rate")
     parser.add_argument('--batch_size', type=int, default=4, help="Batch Size")
 
     parser.add_argument('--loss', default="training_loss", help="loss function in metrics.py")
@@ -252,13 +304,13 @@ if __name__=="__main__":
                         help="continue train from checkpoint in save_dir")
 
     parser.add_argument('--late_stage_model', default="UniformResidual", help="Model for late stage diffuse field")
-    parser.add_argument('--n_fibonacci', type=int, default=128, help="Number of Points to distribute on a sphere")    
+    parser.add_argument('--n_fibonacci', type=int, default=128, help="Number of Points to distribute on a sphere")
     parser.add_argument('--toa_perturb', action='store_true', default=True, help="time-of-arrival perturbation")
     parser.add_argument('--model_transmission', action='store_true', default=False, help="Transmission Modeling")
     parser.add_argument('--fs',type=int, default=48000, help="Sample Rate")
 
     parser.add_argument('--pink_noise_supervision', action='store_true', default=True, help="Use pink noise")
-    parser.add_argument('--pink_start_epoch', type=int, default=500, help="N. epochs before we train with pink noise")
+    parser.add_argument('--pink_start_epoch', type=int, default=100, help="N. epochs before we train with pink noise")
 
     #Skipping various stages
     parser.add_argument('--skip_train', action='store_true',default=False, help="Skip training")
@@ -270,23 +322,28 @@ if __name__=="__main__":
     args = parser.parse_args()
 
     #Loading Dataset
-    print("Loading Dataset:\t" + args.dataset_name)
     D = rooms.dataset.dataLoader(args.dataset_name)
 
+    print(f"Loaded dataset: {args.dataset_name}")
+    print(f"Number of sources: {len(D.speaker_xyz)}")
+    print(f"Number of listener positions: {len(D.xyzs)}")
+    print(f"n_data_per_source: {len(D.xyzs) // len(D.speaker_xyz) if len(D.speaker_xyz.shape) == 2 else len(D.xyzs)}")
+    print(f"Calling inference with {len(D.xyzs)} listener positions and {len(D.speaker_xyz)} sources")
+        
     R = render.Renderer(n_surfaces=len(D.all_surfaces), n_fibonacci=args.n_fibonacci,
                         late_stage_model=args.late_stage_model,
-                        toa_perturb = args.toa_perturb, model_transmission=args.model_transmission).cuda()
+                        toa_perturb = args.toa_perturb, model_transmission=args.model_transmission).to(device)
     loss_fcn = getattr(metrics, args.loss) #Get loss function from metrics.py
     gt_audio = D.RIRs[:, :R.RIR_length]
-
+    
 
     """
     Training
     """
     if not args.skip_train:
         print("Training")
-        print("Loading Paths from\t" + args.load_dir)
-
+        print("Loading Paths from:\t" + ", ".join(args.load_dir))
+        
         #Initialize Listeners
         Ls = initialize(indices=D.train_indices,
                         listener_xyzs=D.xyzs,
@@ -327,7 +384,9 @@ if __name__=="__main__":
             np.save(os.path.join(pred_dir,"pred_musics.npy"), pred_music)
     else:
         pred_rirs = np.load(os.path.join(pred_dir, "pred_rirs.npy"))
-        pred_music = np.load(os.path.join(pred_dir, "pred_musics.npy"))
+        
+        if not args.skip_music:
+            pred_music = np.load(os.path.join(pred_dir, "pred_musics.npy"))
 
 
 
@@ -338,12 +397,19 @@ if __name__=="__main__":
         errors_dir = os.path.join(args.save_dir, "errors")
         makedir_if_needed(errors_dir)
         list_of_metrics = metrics.baseline_metrics
-
+        
+        print("pred_rirs.shape:", pred_rirs.shape)
+        print("gt_audio.shape:", gt_audio.shape)
         if args.valid:
+            print("eval_indices (valid):", D.valid_indices)
             eval_indices = D.valid_indices
         else:
+            print("eval_indices (test):", D.test_indices)
             eval_indices = D.test_indices
+            
 
+        print(f"pred_rirs.shape: {pred_rirs.shape}, gt_audio.shape: {gt_audio.shape}")
+        
         # Evaluating RIR Interp
         for eval_metric in list_of_metrics:
 
@@ -376,7 +442,7 @@ if __name__=="__main__":
             bin_rir = binauralize.render_binaural(R=R, source_xyz = D.speaker_xyz,
                                                 source_axis_1=None, source_axis_2=None,
                                                 listener_xyz=binaural_RIR_xyz,
-                                                listener_forward=D.default_binaural_listener_forward, 
+                                                listener_forward=D.default_binaural_listener_forward,
                                                 listener_left=D.default_binaural_listener_left,
                                                 surfaces=D.all_surfaces,
                                                 speed_of_sound=D.speed_of_sound,
